@@ -1,20 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../stores/chat'
 import ChatMessage from './ChatMessage.vue'
 import ChatInput from './ChatInput.vue'
 
 const chatStore = useChatStore()
-const { messages, isStreaming, error, provider, modelConfigured, canSend } =
+const { messages, isStreaming, error, canSend } =
   storeToRefs(chatStore)
 
 const listRef = ref<HTMLElement | null>(null)
-
-const statusText = computed(() => {
-  if (!modelConfigured.value) return '未配置 API Key'
-  return `已连接 · ${provider.value}`
-})
 
 watch(
   () => messages.value.length,
@@ -36,7 +31,6 @@ watch(
   },
 )
 
-chatStore.fetchHealth()
 </script>
 
 <template>
@@ -47,7 +41,6 @@ chatStore.fetchHealth()
         <p>Vue3 + TypeScript + Node BFF · 流式对话</p>
       </div>
       <div class="header-actions">
-        <span class="status" :class="{ warn: !modelConfigured }">{{ statusText }}</span>
         <button type="button" class="ghost" :disabled="isStreaming" @click="chatStore.clearMessages()">
           清空会话
         </button>
@@ -64,7 +57,13 @@ chatStore.fetchHealth()
       <p v-if="error" class="error">{{ error }}</p>
     </main>
 
-    <ChatInput :disabled="!canSend" @send="chatStore.sendMessage" />
+    <ChatInput
+      :disabled="!canSend"
+      :is-streaming="isStreaming"
+      @send="chatStore.sendMessage"
+      @stop="chatStore.stopGeneration"
+      @select-key="chatStore.selectedKeyId = $event"
+    />
   </div>
 </template>
 
@@ -72,7 +71,7 @@ chatStore.fetchHealth()
 .chat-layout {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - 54px);
   background: #0d1117;
   color: #e6edf3;
 }

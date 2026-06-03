@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { streamChat, checkHealth } from '../api/chat'
+import { streamChat } from '../api/chat'
 import type { ChatMessage } from '../types/chat'
 
 let messageId = 0
@@ -21,19 +21,15 @@ export const useChatStore = defineStore('chat', () => {
   ])
   const isStreaming = ref(false)
   const error = ref<string | null>(null)
-  const provider = ref('')
-  const modelConfigured = ref(false)
+  const controller = ref<AbortController | null>(null)
+  const selectedKeyId = ref<number | null>(null)
 
   const canSend = computed(() => !isStreaming.value)
 
-  async function fetchHealth() {
-    try {
-      const data = await checkHealth()
-      provider.value = data.provider
-      modelConfigured.value = data.modelConfigured
-    } catch {
-      provider.value = 'unknown'
-      modelConfigured.value = false
+  function stopGeneration() {
+    if (controller.value) {
+      controller.value.abort()
+      controller.value = null
     }
   }
 
@@ -62,7 +58,8 @@ export const useChatStore = defineStore('chat', () => {
     })
 
     isStreaming.value = true
-    const controller = new AbortController()
+    const ctrl = new AbortController()
+    controller.value = ctrl
 
     try {
       await streamChat(
@@ -71,17 +68,24 @@ export const useChatStore = defineStore('chat', () => {
           const target = messages.value.find((m) => m.id === assistantId)
           if (target) target.content += chunk
         },
-        controller.signal,
+        ctrl.signal,
+        selectedKeyId.value,
       )
-    } catch (e) {
-      const target = messages.value.find((m) => m.id === assistantId)
-      const message = e instanceof Error ? e.message : '发送失败'
-      error.value = message
-      if (target && !target.content) {
-        target.content = `出错了：${message}`
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        const target = messages.value.find((m) => m.id === assistantId)
+        if (target && !target.content) target.content = '(已停止生成)'
+      } else {
+        const target = messages.value.find((m) => m.id === assistantId)
+        const message = e instanceof Error ? e.message : '发送失败'
+        error.value = message
+        if (target && !target.content) {
+          target.content = `出错了：${message}`
+        }
       }
     } finally {
       isStreaming.value = false
+      controller.value = null
     }
   }
 
@@ -102,11 +106,10 @@ export const useChatStore = defineStore('chat', () => {
     messages,
     isStreaming,
     error,
-    provider,
-    modelConfigured,
     canSend,
-    fetchHealth,
+    selectedKeyId,
     sendMessage,
     clearMessages,
+    stopGeneration,
   }
 })

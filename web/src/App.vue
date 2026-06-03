@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import ChatWindow from './components/chat/ChatWindow.vue'
+import { onMounted } from 'vue'
+import { useAuthStore } from './stores/auth'
+
+const auth = useAuthStore()
+
+onMounted(() => {
+  auth.loadFromStorage()
+})
 </script>
 
 <template>
-  <ChatWindow />
+  <router-view />
 </template>

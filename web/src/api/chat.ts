@@ -4,11 +4,19 @@ export async function streamChat(
   messages: ChatRequestMessage[],
   onChunk: (text: string) => void,
   signal?: AbortSignal,
+  keyId?: number | null,
 ): Promise<void> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('token')
+  if (token) headers['Authorization'] = 'Bearer ' + token
+
+  const body: Record<string, unknown> = { messages }
+  if (keyId) body.keyId = keyId
+
   const response = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages }),
+    headers,
+    body: JSON.stringify(body),
     signal,
   })
 
@@ -17,9 +25,7 @@ export async function streamChat(
     try {
       const data = await response.json()
       if (data.error) message = data.error
-    } catch {
-      // ignore json parse error
-    }
+    } catch {}
     throw new Error(message)
   }
 
@@ -29,19 +35,23 @@ export async function streamChat(
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
+  let buffer = ''
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
-    onChunk(decoder.decode(value, { stream: true }))
+    buffer += decoder.decode(value, { stream: true })
+    while (buffer.includes('\n')) {
+      const idx = buffer.indexOf('\n')
+      const line = buffer.slice(0, idx).trim()
+      buffer = buffer.slice(idx + 1)
+      if (!line.startsWith('data:')) continue
+      const payload = line.slice(5).trim()
+      if (!payload || payload === '[DONE]') continue
+      try {
+        const parsed = JSON.parse(payload)
+        if (typeof parsed === 'string') onChunk(parsed)
+      } catch {}
+    }
   }
-}
-
-export async function checkHealth(): Promise<{
-  ok: boolean
-  provider: string
-  modelConfigured: boolean
-}> {
-  const response = await fetch('/api/health')
-  return response.json()
 }

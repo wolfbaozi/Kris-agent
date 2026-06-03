@@ -9,7 +9,7 @@ defineProps<{
 
 <template>
   <div class="message" :class="message.role">
-    <div class="avatar">{{ message.role === 'user' ? '你' : 'AI' }}</div>
+    <div class="avatar">{{ message.role === 'user' ? '你' : 'Kris' }}</div>
     <div class="bubble">
       <p class="content">{{ message.content }}<span v-if="streaming" class="cursor">▍</span></p>
     </div>

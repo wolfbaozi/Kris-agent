@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { keysApi } from '../../api/index'
 
 interface KeyOption {
@@ -22,12 +22,26 @@ const emit = defineEmits<{
 
 const input = ref('')
 const keys = ref<KeyOption[]>([])
+const textRef = ref<HTMLTextAreaElement | null>(null)
+
+function adjustHeight() {
+  const el = textRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 200) + 'px'
+}
+
+async function onInput() {
+  await nextTick()
+  adjustHeight()
+}
 
 function submit() {
   const text = input.value.trim()
   if (!text) return
   emit('send', text)
   input.value = ''
+  nextTick(() => adjustHeight())
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -58,8 +72,9 @@ onMounted(async () => {
         v-model="input"
         :disabled="disabled"
         placeholder="输入问题，Enter 发送，Shift+Enter 换行"
-        rows="3"
+        rows="1"
         @keydown="onKeydown"
+        @input="onInput"
       />
       <div class="input-toolbar">
         <select v-if="keys.length > 0" class="model-select" @change="onSelectKey">
@@ -100,9 +115,9 @@ onMounted(async () => {
 textarea {
   width: 100%;
   resize: none;
-  min-height: 72px;
+  min-height: 40px;
   max-height: 200px;
-  padding: 12px 14px 8px;
+  padding: 10px 14px 8px;
   border: none;
   background: transparent;
   color: #e6edf3;
@@ -110,6 +125,7 @@ textarea {
   line-height: 1.5;
   box-sizing: border-box;
   outline: none;
+  overflow-y: auto;
 }
 
 textarea:disabled {

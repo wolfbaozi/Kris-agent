@@ -11,24 +11,16 @@ const { messages, isStreaming, error, canSend } =
 
 const listRef = ref<HTMLElement | null>(null)
 
-watch(
-  () => messages.value.length,
-  async () => {
-    await nextTick()
-    if (listRef.value) {
-      listRef.value.scrollTop = listRef.value.scrollHeight
-    }
-  },
-)
+async function scrollToBottom() {
+  await nextTick()
+  if (listRef.value) {
+    listRef.value.scrollTop = listRef.value.scrollHeight
+  }
+}
 
 watch(
-  () => messages.value[messages.value.length - 1]?.content,
-  async () => {
-    await nextTick()
-    if (listRef.value) {
-      listRef.value.scrollTop = listRef.value.scrollHeight
-    }
-  },
+  [() => messages.value.length, () => messages.value[messages.value.length - 1]?.content],
+  scrollToBottom,
 )
 
 </script>

@@ -35,10 +35,7 @@ function openAdd() {
 
 function onProviderChange(p: string) {
   if (editingId.value) return
-  if (p === 'doubao') {
-    form.value.baseUrl = 'https://ark.cn-beijing.volces.com/api/v3'
-    form.value.model = ''
-  } else if (p === 'volcano') {
+  if (p === 'doubao' || p === 'volcano') {
     form.value.baseUrl = 'https://ark.cn-beijing.volces.com/api/v3'
     form.value.model = ''
   } else {
@@ -127,7 +124,7 @@ onMounted(loadKeys)
           <label>API Key</label>
           <input v-model="form.apiKey" type="password" :placeholder="editingId ? '留空则不修改' : '请输入 API Key'" />
           <label>模型名称（可选）</label>
-          <input v-model="form.model" placeholder="如 deepseek-chat / gpt-4o-mini" />
+          <input v-model="form.model" :placeholder="['doubao','volcano'].includes(form.provider) ? '如 ep-xxxxxxxx 或 doubao-lite-32k-240828' : '如 deepseek-chat / gpt-4o-mini'" />
           <label>Base URL（可选，OpenAI可不填）</label>
           <input v-model="form.baseUrl" placeholder="自定义 baseURL" />
           <div class="modal-actions">

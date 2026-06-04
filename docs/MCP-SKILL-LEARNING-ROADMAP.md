@@ -147,15 +147,77 @@ Skill 是一段系统提示词，注入到 system message 中，改变 AI 的行
 
 ---
 
-## 三、数据库设计
+## 三、权限与隔离设计
 
-### 3.1 MCP Server 配置表
+### 3.1 Kris 账户 = 全局管理员
+
+Kris 是本项目的开发者账户，其配置的 MCP 和 Skill 对所有注册用户全局共享。其他用户自己添加的配置仅对自己可见。
+
+**数据加载规则：**
+
+```
+每次对话加载 MCP/Skill 的来源 =
+  Kris 账户下所有 enabled 的全局配置（is_global = 1）
+  +
+  当前登录用户自己 enabled 的私有配置（is_global = 0）
+```
+
+**数据库标记方式：** 新增 `is_global` 字段，Kris 的配置设为 `1`，其他用户的配置固定为 `0`。
+
+### 3.2 本地开发双重隔离
+
+防止线上其他用户的 MCP 子进程在本地机器上被误启动。
+
+**隔离层一：环境变量**
+
+在 `server/.env` 中设置：
+```env
+# 本地开发环境标识，仅加载本地绑定的 MCP 配置
+RUN_ENV=local
+```
+
+在线上 Docker 部署时设置：
+```env
+RUN_ENV=production
+```
+
+**隔离层二：MCP 配置绑定运行环境**
+
+`mcp_servers` 表新增 `run_env` 字段：
+
+```
+run_env = 'local'       - 仅在本地开发环境启动子进程
+run_env = 'production'  - 仅在线上生产环境启动子进程
+run_env = 'all'         - 所有环境都启动
+```
+
+**加载过滤逻辑：**
+
+```javascript
+// services/mcp-loader.js
+const currentEnv = process.env.RUN_ENV || 'production'
+
+// 只加载匹配当前运行环境的 MCP
+const validConfigs = mcpConfigs.filter(
+  m => m.run_env === 'all' || m.run_env === currentEnv
+)
+```
+
+这样 Kris 在本地配置的 `run_env = 'local'` 的 MCP Server，线上用户发起对话时后端不会尝试启动这些子进程，反之亦然。
+
+---
+
+## 四、数据库设计
+
+### 4.1 MCP Server 配置表
 
 ```sql
 CREATE TABLE mcp_servers (
   id           INT          AUTO_INCREMENT PRIMARY KEY,
   user_id      INT          NOT NULL,
   name         VARCHAR(100) NOT NULL,
+  is_global    TINYINT(1)   DEFAULT 0,              -- 1=Kris全局共享，0=私有
+  run_env      ENUM('local','production','all') NOT NULL DEFAULT 'all',
   source_type  ENUM('database','file') NOT NULL DEFAULT 'database',
   server_type  VARCHAR(50)  DEFAULT '',
   command      VARCHAR(255) DEFAULT '',
@@ -169,13 +231,14 @@ CREATE TABLE mcp_servers (
 );
 ```
 
-### 3.2 Skill 表
+### 4.2 Skill 表
 
 ```sql
 CREATE TABLE skills (
   id             INT          AUTO_INCREMENT PRIMARY KEY,
   user_id        INT          NOT NULL,
   name           VARCHAR(100) NOT NULL,
+  is_global      TINYINT(1)   DEFAULT 0,            -- 1=Kris全局共享，0=私有
   skill_type     ENUM('tool','prompt') NOT NULL DEFAULT 'tool',
   source_type    ENUM('database','file') NOT NULL DEFAULT 'database',
   tool_schema    JSON         DEFAULT NULL,
@@ -190,9 +253,9 @@ CREATE TABLE skills (
 
 ---
 
-## 四、后端开发规划
+## 五、后端开发规划
 
-### 4.1 API 层（routes）
+### 5.1 API 层（routes）
 
 | 文件 | 路由前缀 | 功能 |
 |------|----------|------|
@@ -202,66 +265,78 @@ CREATE TABLE skills (
 **MCP 路由清单：**
 
 ```
-GET    /api/mcps          - 获取当前用户所有 MCP 配置
-POST   /api/mcps          - 新增 MCP 配置（database 模式）
-PUT    /api/mcps/:id      - 更新 MCP 配置
-DELETE /api/mcps/:id      - 删除 MCP 配置
-POST   /api/mcps/upload   - 上传 MCP 配置文件（file 模式）
-PATCH  /api/mcps/:id/toggle - 启用/禁用 MCP
+GET    /api/mcps              - 获取列表（自己的私有 + Kris 全局共享）
+POST   /api/mcps              - 新增 MCP 配置（database 模式）
+PUT    /api/mcps/:id          - 更新 MCP 配置（只能改自己的）
+DELETE /api/mcps/:id          - 删除 MCP 配置（只能删自己的）
+POST   /api/mcps/upload       - 上传 MCP 配置文件（file 模式）
+PATCH  /api/mcps/:id/toggle   - 启用/禁用 MCP
 ```
 
 **Skill 路由清单：**
 
 ```
-GET    /api/skills          - 获取当前用户所有 Skill
-POST   /api/skills          - 新增 Skill（database 模式）
-PUT    /api/skills/:id      - 更新 Skill
-DELETE /api/skills/:id      - 删除 Skill
-POST   /api/skills/upload   - 上传 Skill 文件（file 模式）
+GET    /api/skills            - 获取列表（自己的私有 + Kris 全局共享）
+POST   /api/skills            - 新增 Skill（database 模式）
+PUT    /api/skills/:id        - 更新 Skill（只能改自己的）
+DELETE /api/skills/:id        - 删除 Skill（只能删自己的）
+POST   /api/skills/upload     - 上传 Skill 文件（file 模式）
 PATCH  /api/skills/:id/toggle - 启用/禁用 Skill
 ```
 
-### 4.2 Services 层
+### 5.2 Services 层
 
 | 文件 | 职责 |
 |------|------|
-| `services/mcp-loader.js` | 启动 MCP 子进程，获取并转换 Tool 列表 |
-| `services/skill-loader.js` | 加载 Skill，区分 tool 类型和 prompt 类型 |
+| `services/mcp-loader.js` | 启动 MCP 子进程（含环境过滤），获取并转换 Tool 列表 |
+| `services/skill-loader.js` | 加载 Skill（含全局共享合并），区分 tool 和 prompt 类型 |
 | `services/chat.js`（改造） | 集成 MCP Tool + Skill Tool，注入 streamText |
 
-**`mcp-loader.js` 核心逻辑：**
+**`mcp-loader.js` 核心逻辑（含双重隔离）：**
 
 ```javascript
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { tool } from 'ai'
-import { z } from 'zod'
 
-export async function loadMcpTools(mcpConfig) {
+const currentEnv = process.env.RUN_ENV || 'production'
+
+export async function loadMcpTools(userId, mcpIds) {
+  // 查询：当前用户私有 + Kris 全局共享，且匹配当前运行环境
+  const configs = await getMcpConfigs(userId, mcpIds, currentEnv)
+  const allTools = {}
+  for (const config of configs) {
+    const tools = await startMcpProcess(config)
+    Object.assign(allTools, tools)
+  }
+  return allTools
+}
+
+async function startMcpProcess(config) {
   const transport = new StdioClientTransport({
-    command: mcpConfig.command,
-    args: mcpConfig.args,
-    env: mcpConfig.env,
+    command: config.command,
+    args: config.args ?? [],
+    env: { ...process.env, ...(config.env ?? {}) },
   })
   const client = new Client({ name: 'kris-agent', version: '1.0.0' })
   await client.connect(transport)
   const { tools } = await client.listTools()
-  // 将 MCP Tool 转换为 AI SDK tool 格式
   return convertMcpTools(tools, client)
 }
 ```
 
-**`skill-loader.js` 核心逻辑：**
+**`skill-loader.js` 核心逻辑（含全局共享合并）：**
 
 ```javascript
-export function loadSkillTools(skills) {
+export async function loadSkills(userId, skillIds) {
+  // 查询：当前用户私有 + Kris 全局共享
+  const skills = await getSkillConfigs(userId, skillIds)
   const tools = {}
   const promptParts = []
 
   for (const skill of skills) {
     if (skill.skill_type === 'tool') {
       tools[skill.name] = buildToolFromSkill(skill)
-    } else if (skill.skill_type === 'prompt') {
+    } else {
       promptParts.push(skill.prompt_content)
     }
   }
@@ -270,11 +345,23 @@ export function loadSkillTools(skills) {
 }
 ```
 
+**数据库查询示例（获取当前用户可用的 MCP）：**
+
+```sql
+SELECT * FROM mcp_servers
+WHERE enabled = 1
+  AND (run_env = 'all' OR run_env = ?)   -- 当前运行环境
+  AND (
+    user_id = ?                           -- 用户自己的私有配置
+    OR is_global = 1                      -- Kris 的全局配置
+  )
+```
+
 ---
 
-## 五、前端开发规划
+## 六、前端开发规划
 
-### 5.1 新增页面/组件
+### 6.1 新增页面/组件
 
 | 组件 | 路径 | 说明 |
 |------|------|------|
@@ -283,55 +370,61 @@ export function loadSkillTools(skills) {
 | `McpForm.vue` | `components/McpForm.vue` | MCP 配置表单 |
 | `SkillForm.vue` | `components/SkillForm.vue` | Skill 配置表单 |
 
-### 5.2 新增 API 层
+**列表展示规则：**
+- `is_global = 1` 的条目标记为"全局"标签，不显示编辑/删除按钮（非 Kris 账户无权修改）
+- `is_global = 0` 的条目显示编辑/删除按钮
+- Kris 账户登录时，可以对自己的配置设置 `is_global` 开关
+
+### 6.2 新增 API 层
 
 | 文件 | 说明 |
 |------|------|
 | `api/mcp.ts` | MCP CRUD + 文件上传接口封装 |
 | `api/skill.ts` | Skill CRUD + 文件上传接口封装 |
 
-### 5.3 新增 Store
+### 6.3 新增 Store
 
 | 文件 | 说明 |
 |------|------|
 | `stores/mcp.ts` | MCP 列表状态管理 |
 | `stores/skill.ts` | Skill 列表状态管理 |
 
-### 5.4 聊天界面改造
+### 6.4 聊天界面改造
 
 - 在 `ChatInput.vue` 中增加 MCP / Skill 快速开关
 - 请求体中携带 `mcpIds[]` 和 `skillIds[]`，告知后端本次对话启用哪些扩展
 
 ---
 
-## 六、开发执行顺序
+## 七、开发执行顺序
 
 ```
 阶段一：数据基础
-  Step 1 - 数据库迁移：新增 mcp_servers、skills 两张表
+  Step 1 - 数据库迁移：新增 mcp_servers、skills 两张表（含 is_global、run_env 字段）
   Step 2 - server/initdb.js 更新初始化脚本
+  Step 3 - server/.env 新增 RUN_ENV 字段
 
 阶段二：后端 CRUD
-  Step 3 - routes/mcps.js：MCP 配置 CRUD API
-  Step 4 - routes/skills.js：Skill CRUD API
-  Step 5 - services/mcp-loader.js：MCP 子进程加载器
-  Step 6 - services/skill-loader.js：Skill 加载器
+  Step 4 - routes/mcps.js：MCP 配置 CRUD API
+  Step 5 - routes/skills.js：Skill CRUD API
+  Step 6 - services/mcp-loader.js：MCP 子进程加载器（含环境过滤 + 全局合并）
+  Step 7 - services/skill-loader.js：Skill 加载器（含全局合并）
 
 阶段三：对话集成
-  Step 7 - 改造 services/chat.js：集成 MCP Tool + Skill
-  Step 8 - 改造 routes/chat.js：接收 mcpIds/skillIds 参数
+  Step 8 - 改造 services/chat.js：集成 MCP Tool + Skill
+  Step 9 - 改造 routes/chat.js：接收 mcpIds/skillIds 参数
 
 阶段四：前端
-  Step 9  - api/mcp.ts + api/skill.ts
-  Step 10 - stores/mcp.ts + stores/skill.ts
-  Step 11 - McpModal.vue + SkillModal.vue
-  Step 12 - ChatInput.vue 增加 MCP/Skill 开关
-  Step 13 - ChatPage.vue 接入管理面板入口
+  Step 10 - api/mcp.ts + api/skill.ts
+  Step 11 - stores/mcp.ts + stores/skill.ts
+  Step 12 - McpModal.vue + SkillModal.vue（含全局标签展示）
+  Step 13 - ChatInput.vue 增加 MCP/Skill 开关
+  Step 14 - ChatPage.vue 接入管理面板入口
 ```
 
 ---
 
-## 七、本地学习练习建议
+## 八、本地学习练习建议
 
 ### 练习一：写一个最简单的 MCP Server
 
@@ -369,7 +462,7 @@ npx ts-node my-mcp-server.ts
 
 ---
 
-## 八、关键依赖包
+## 九、关键依赖包
 
 ```bash
 # 后端新增
@@ -380,7 +473,7 @@ npm install @modelcontextprotocol/sdk zod multer
 
 ---
 
-## 九、文件存储规范（file 模式）
+## 十、文件存储规范（file 模式）
 
 上传的 MCP 配置文件和 Skill 文件统一存放在：
 

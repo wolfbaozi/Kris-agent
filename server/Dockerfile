@@ -2,8 +2,8 @@ FROM docker.m.daocloud.io/node:20-alpine
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY package.json ./
+RUN npm install --omit=dev
 
 COPY . .
 

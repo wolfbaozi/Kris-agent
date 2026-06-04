@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { md5 } from 'js-md5'
 import { authApi } from '../api/index'
 
 export interface UserInfo {
@@ -23,12 +24,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function login(username: string, password: string) {
-    const data = await authApi.login(username, password)
+    const data = await authApi.login(username, md5(password))
     setSession(data)
   }
 
   async function register(username: string, password: string) {
-    const data = await authApi.register(username, password)
+    const data = await authApi.register(username, md5(password))
     setSession(data)
   }
 

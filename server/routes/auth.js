@@ -10,8 +10,8 @@ router.post('/register', async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: '用户名和密码不能为空' })
   }
-  if (password.length < 6) {
-    return res.status(400).json({ error: '密码长度至少6位' })
+  if (password.length !== 32) {
+    return res.status(400).json({ error: '密码格式错误' })
   }
   const [rows] = await pool.query('SELECT id FROM users WHERE username = ?', [username])
   if (rows.length > 0) {
@@ -27,6 +27,9 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body || {}
   if (!username || !password) {
     return res.status(400).json({ error: '用户名和密码不能为空' })
+  }
+  if (password.length !== 32) {
+    return res.status(400).json({ error: '密码格式错误' })
   }
   const [rows] = await pool.query('SELECT id, password_hash FROM users WHERE username = ?', [username])
   if (rows.length === 0) {

@@ -45,6 +45,46 @@ async function setup() {
   `)
   console.log('Table api_keys created.')
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mcp_servers (
+      id          INT          AUTO_INCREMENT PRIMARY KEY,
+      user_id     INT          NOT NULL,
+      name        VARCHAR(100) NOT NULL,
+      is_global   TINYINT(1)   NOT NULL DEFAULT 0,
+      run_env     ENUM('local','production','all') NOT NULL DEFAULT 'all',
+      source_type ENUM('database','file') NOT NULL DEFAULT 'database',
+      server_type VARCHAR(50)  NOT NULL DEFAULT '',
+      command     VARCHAR(255) NOT NULL DEFAULT '',
+      args        JSON         DEFAULT NULL,
+      env         JSON         DEFAULT NULL,
+      file_path   VARCHAR(500) NOT NULL DEFAULT '',
+      enabled     TINYINT(1)   NOT NULL DEFAULT 1,
+      config      JSON         DEFAULT NULL,
+      created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  console.log('Table mcp_servers created.')
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS skills (
+      id             INT          AUTO_INCREMENT PRIMARY KEY,
+      user_id        INT          NOT NULL,
+      name           VARCHAR(100) NOT NULL,
+      is_global      TINYINT(1)   NOT NULL DEFAULT 0,
+      skill_type     ENUM('tool','prompt') NOT NULL DEFAULT 'tool',
+      source_type    ENUM('database','file') NOT NULL DEFAULT 'database',
+      tool_schema    JSON         DEFAULT NULL,
+      tool_code      TEXT         DEFAULT NULL,
+      prompt_content TEXT         DEFAULT NULL,
+      file_path      VARCHAR(500) NOT NULL DEFAULT '',
+      enabled        TINYINT(1)   NOT NULL DEFAULT 1,
+      created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  console.log('Table skills created.')
+
   await pool.end()
   console.log('Setup complete.')
 }

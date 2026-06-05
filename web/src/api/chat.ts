@@ -1,10 +1,20 @@
 import type { ChatRequestMessage } from '../types/chat'
 
+export interface StreamChunk {
+  type: 'text-delta' | 'tool-call' | 'tool-result' | 'error' | 'done'
+  content?: string
+  toolName?: string
+  args?: unknown
+  result?: unknown
+}
+
 export async function streamChat(
   messages: ChatRequestMessage[],
-  onChunk: (text: string) => void,
+  onChunk: (chunk: StreamChunk) => void,
   signal?: AbortSignal,
   keyId?: number | null,
+  mcpIds?: number[],
+  skillIds?: number[],
 ): Promise<void> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('token')
@@ -12,6 +22,8 @@ export async function streamChat(
 
   const body: Record<string, unknown> = { messages }
   if (keyId) body.keyId = keyId
+  if (mcpIds && mcpIds.length > 0) body.mcpIds = mcpIds
+  if (skillIds && skillIds.length > 0) body.skillIds = skillIds
 
   const response = await fetch('/api/chat', {
     method: 'POST',
@@ -47,10 +59,11 @@ export async function streamChat(
       buffer = buffer.slice(idx + 1)
       if (!line.startsWith('data:')) continue
       const payload = line.slice(5).trim()
-      if (!payload || payload === '[DONE]') continue
+      if (!payload) continue
       try {
         const parsed = JSON.parse(payload)
-        if (typeof parsed === 'string') onChunk(parsed)
+        if (parsed.type === 'done') return
+        onChunk(parsed as StreamChunk)
       } catch {}
     }
   }

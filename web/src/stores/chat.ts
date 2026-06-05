@@ -23,6 +23,8 @@ export const useChatStore = defineStore('chat', () => {
   const error = ref<string | null>(null)
   const controller = ref<AbortController | null>(null)
   const selectedKeyId = ref<number | null>(null)
+  const selectedMcpIds = ref<number[]>([])
+  const selectedSkillIds = ref<number[]>([])
 
   const canSend = computed(() => !isStreaming.value)
 
@@ -65,11 +67,21 @@ export const useChatStore = defineStore('chat', () => {
       await streamChat(
         payload,
         (chunk) => {
-          const target = messages.value.find((m) => m.id === assistantId)
-          if (target) target.content += chunk
+          if (!messages.value.length) return
+          const lastMsg = messages.value[messages.value.length - 1]
+          if (lastMsg.id !== assistantId || lastMsg.role !== 'assistant') return
+          if (chunk.type === 'text-delta') {
+            lastMsg.content += chunk.content || ''
+          } else if (chunk.type === 'tool-call') {
+            lastMsg.content += `\n[调用工具: ${chunk.toolName}(${JSON.stringify(chunk.args)})]\n\n`
+          } else if (chunk.type === 'tool-result') {
+            lastMsg.content += `\n[工具 ${chunk.toolName} 返回: ${typeof chunk.result === 'string' ? chunk.result : JSON.stringify(chunk.result)}]\n`
+          }
         },
         ctrl.signal,
         selectedKeyId.value,
+        selectedMcpIds.value,
+        selectedSkillIds.value,
       )
     } catch (e: any) {
       if (e.name === 'AbortError') {
@@ -108,6 +120,8 @@ export const useChatStore = defineStore('chat', () => {
     error,
     canSend,
     selectedKeyId,
+    selectedMcpIds,
+    selectedSkillIds,
     sendMessage,
     clearMessages,
     stopGeneration,

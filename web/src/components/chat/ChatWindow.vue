@@ -55,6 +55,8 @@ watch(
       @send="chatStore.sendMessage"
       @stop="chatStore.stopGeneration"
       @select-key="chatStore.selectedKeyId = $event"
+      @select-mcp="chatStore.selectedMcpIds = $event"
+      @select-skill="chatStore.selectedSkillIds = $event"
     />
   </div>
 </template>

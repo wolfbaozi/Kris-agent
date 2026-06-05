@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
 import { keysApi } from '../../api/index'
+import { useMcpStore } from '../../stores/mcp'
+import { useSkillStore } from '../../stores/skill'
 
 interface KeyOption {
   id: number
@@ -18,11 +20,32 @@ const emit = defineEmits<{
   send: [content: string]
   stop: []
   selectKey: [keyId: number]
+  selectMcp: [mcpIds: number[]]
+  selectSkill: [skillIds: number[]]
 }>()
 
 const input = ref('')
 const keys = ref<KeyOption[]>([])
 const textRef = ref<HTMLTextAreaElement | null>(null)
+const mcpStore = useMcpStore()
+const skillStore = useSkillStore()
+const selectedMcpIds = ref<Set<number>>(new Set())
+const selectedSkillIds = ref<Set<number>>(new Set())
+
+watch(selectedMcpIds, (ids) => emit('selectMcp', [...ids]), { deep: true })
+watch(selectedSkillIds, (ids) => emit('selectSkill', [...ids]), { deep: true })
+
+function toggleMcp(id: number) {
+  const s = new Set(selectedMcpIds.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  selectedMcpIds.value = s
+}
+
+function toggleSkill(id: number) {
+  const s = new Set(selectedSkillIds.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  selectedSkillIds.value = s
+}
 
 function adjustHeight() {
   const el = textRef.value
@@ -61,11 +84,48 @@ onMounted(async () => {
   try {
     keys.value = await keysApi.list()
   } catch {}
+  mcpStore.fetchList()
+  skillStore.fetchList()
 })
 </script>
 
 <template>
   <div class="chat-input">
+    <div class="ext-selects" v-if="mcpStore.enabledList.length > 0 || skillStore.enabledList.length > 0">
+      <div v-if="mcpStore.enabledList.length > 0" class="ext-group">
+        <span class="ext-label">MCP</span>
+        <label
+          v-for="m in mcpStore.enabledList"
+          :key="m.id"
+          class="ext-item"
+          :class="{ active: selectedMcpIds.has(m.id) }"
+        >
+          <input
+            type="checkbox"
+            :checked="selectedMcpIds.has(m.id)"
+            @change="toggleMcp(m.id)"
+          />
+          <span>{{ m.name }}</span>
+        </label>
+      </div>
+      <div v-if="skillStore.enabledList.length > 0" class="ext-group">
+        <span class="ext-label">Skill</span>
+        <label
+          v-for="s in skillStore.enabledList"
+          :key="s.id"
+          class="ext-item"
+          :class="{ active: selectedSkillIds.has(s.id) }"
+        >
+          <input
+            type="checkbox"
+            :checked="selectedSkillIds.has(s.id)"
+            @change="toggleSkill(s.id)"
+          />
+          <span>{{ s.name }}</span>
+        </label>
+      </div>
+    </div>
+
     <div class="input-box">
       <textarea
         ref="textRef"
@@ -78,6 +138,7 @@ onMounted(async () => {
       />
       <div class="input-toolbar">
         <select v-if="keys.length > 0" class="model-select" @change="onSelectKey">
+          <option value="">选择模型</option>
           <option v-for="k in keys" :key="k.id" :value="k.id">
             {{ k.provider.toUpperCase() }} - {{ k.model || '默认' }}
           </option>
@@ -99,6 +160,49 @@ onMounted(async () => {
   border-top: 1px solid #30363d;
   padding: 16px 20px;
   background: #161b22;
+}
+
+.ext-selects {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.ext-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ext-label {
+  font-size: 11px;
+  color: #8b949e;
+  font-weight: 600;
+}
+
+.ext-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #c9d1d9;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ext-item.active {
+  border-color: #58a6ff;
+  background: #1f6feb22;
+  color: #58a6ff;
+}
+
+.ext-item input[type="checkbox"] {
+  display: none;
 }
 
 .input-box {

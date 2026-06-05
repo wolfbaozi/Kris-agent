@@ -1,11 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import ChatWindow from '../components/chat/ChatWindow.vue'
 import KeysModal from '../components/KeysModal.vue'
+import McpModal from '../components/McpModal.vue'
+import SkillModal from '../components/SkillModal.vue'
 import { useRouter } from 'vue-router'
+import { useMcpStore } from '../stores/mcp'
+import { useSkillStore } from '../stores/skill'
 
 const router = useRouter()
 const showKeys = ref(false)
+const showMcp = ref(false)
+const showSkill = ref(false)
+const mcpStore = useMcpStore()
+const skillStore = useSkillStore()
 
 function logout() {
   localStorage.removeItem('token')
@@ -13,6 +21,11 @@ function logout() {
   localStorage.removeItem('userId')
   router.push('/login')
 }
+
+onMounted(() => {
+  mcpStore.fetchList()
+  skillStore.fetchList()
+})
 </script>
 
 <template>
@@ -20,6 +33,8 @@ function logout() {
     <header class="chat-header">
       <span class="app-title">Kris Agent</span>
       <div class="header-actions">
+        <button class="btn-outline" @click="showMcp = true">MCP 管理</button>
+        <button class="btn-outline" @click="showSkill = true">Skill 管理</button>
         <button class="btn-outline" @click="showKeys = true">API Key 管理</button>
         <button class="btn-outline" @click="logout">退出登录</button>
       </div>
@@ -28,6 +43,8 @@ function logout() {
       <ChatWindow />
     </main>
     <KeysModal v-if="showKeys" @close="showKeys = false" />
+    <McpModal v-if="showMcp" @close="showMcp = false" />
+    <SkillModal v-if="showSkill" @close="showSkill = false" />
   </div>
 </template>
 

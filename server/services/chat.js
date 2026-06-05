@@ -38,7 +38,7 @@ function writeSSE(res, data) {
   if (typeof res.flush === 'function') res.flush()
 }
 
-export async function streamChatResponse(userId, { keyId, mcpIds, skillIds, messages }, res) {
+export async function streamChatResponse(userId, { keyId, mcpIds, skillIds, messages }, res, passThrough = false) {
   const keyRec = await getKeyRecord(userId, keyId)
   if (!keyRec) return false
 
@@ -54,10 +54,12 @@ export async function streamChatResponse(userId, { keyId, mcpIds, skillIds, mess
     ? `${BASE_SYSTEM_PROMPT}\n\n${systemPromptAppend}`
     : BASE_SYSTEM_PROMPT
 
-  res.setHeader('Content-Type', 'text/event-stream')
-  res.setHeader('Cache-Control', 'no-cache')
-  res.setHeader('Connection', 'keep-alive')
-  res.flushHeaders()
+  if (!passThrough) {
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.flushHeaders()
+  }
 
   const result = streamText({
     model,

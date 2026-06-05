@@ -21,6 +21,7 @@ const routeMap = {
   auth:   '/api/auth',
   apikeys:'/api/apikeys',
   chat:   '/api/chat',
+  debug:  '/api/debug',
   mcps:   '/api/mcps',
   skills: '/api/skills',
 }

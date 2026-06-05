@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { streamChat } from '../api/chat'
+import { debugSkill, debugMcp, type SkillDebugForm, type McpDebugForm } from '../api/debug'
 import type { ChatMessage } from '../types/chat'
 
 let messageId = 0
@@ -101,6 +102,126 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function debugSkillCreate(form: SkillDebugForm, testMessage: string) {
+    if (isStreaming.value) return
+    error.value = null
+
+    const userMessage = `[创建并调试 Skill "${form.name}"]\n测试问题: ${testMessage}`
+    messages.value.push({
+      id: createId(),
+      role: 'user',
+      content: userMessage,
+      createdAt: Date.now(),
+    })
+
+    const assistantId = createId()
+    messages.value.push({
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      createdAt: Date.now(),
+    })
+
+    isStreaming.value = true
+    const ctrl = new AbortController()
+    controller.value = ctrl
+
+    try {
+      await debugSkill(
+        form,
+        testMessage,
+        (chunk) => {
+          if (!messages.value.length) return
+          const lastMsg = messages.value[messages.value.length - 1]
+          if (lastMsg.id !== assistantId || lastMsg.role !== 'assistant') return
+          if (chunk.type === 'text-delta') {
+            lastMsg.content += chunk.content || ''
+          } else if (chunk.type === 'tool-call') {
+            lastMsg.content += `\n[调用工具: ${chunk.toolName}(${JSON.stringify(chunk.args)})]\n\n`
+          } else if (chunk.type === 'tool-result') {
+            lastMsg.content += `\n[工具 ${chunk.toolName} 返回: ${typeof chunk.result === 'string' ? chunk.result : JSON.stringify(chunk.result)}]\n`
+          }
+        },
+        ctrl.signal,
+      )
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        const target = messages.value.find((m) => m.id === assistantId)
+        if (target && !target.content) target.content = '(已停止生成)'
+      } else {
+        const target = messages.value.find((m) => m.id === assistantId)
+        const message = e instanceof Error ? e.message : '调试失败'
+        error.value = message
+        if (target && !target.content) {
+          target.content = `出错了：${message}`
+        }
+      }
+    } finally {
+      isStreaming.value = false
+      controller.value = null
+    }
+  }
+
+  async function debugMcpCreate(form: McpDebugForm, testMessage: string) {
+    if (isStreaming.value) return
+    error.value = null
+
+    const userMessage = `[创建并调试 MCP "${form.name}"]\n测试问题: ${testMessage}`
+    messages.value.push({
+      id: createId(),
+      role: 'user',
+      content: userMessage,
+      createdAt: Date.now(),
+    })
+
+    const assistantId = createId()
+    messages.value.push({
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      createdAt: Date.now(),
+    })
+
+    isStreaming.value = true
+    const ctrl = new AbortController()
+    controller.value = ctrl
+
+    try {
+      await debugMcp(
+        form,
+        testMessage,
+        (chunk) => {
+          if (!messages.value.length) return
+          const lastMsg = messages.value[messages.value.length - 1]
+          if (lastMsg.id !== assistantId || lastMsg.role !== 'assistant') return
+          if (chunk.type === 'text-delta') {
+            lastMsg.content += chunk.content || ''
+          } else if (chunk.type === 'tool-call') {
+            lastMsg.content += `\n[调用工具: ${chunk.toolName}(${JSON.stringify(chunk.args)})]\n\n`
+          } else if (chunk.type === 'tool-result') {
+            lastMsg.content += `\n[工具 ${chunk.toolName} 返回: ${typeof chunk.result === 'string' ? chunk.result : JSON.stringify(chunk.result)}]\n`
+          }
+        },
+        ctrl.signal,
+      )
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        const target = messages.value.find((m) => m.id === assistantId)
+        if (target && !target.content) target.content = '(已停止生成)'
+      } else {
+        const target = messages.value.find((m) => m.id === assistantId)
+        const message = e instanceof Error ? e.message : '调试失败'
+        error.value = message
+        if (target && !target.content) {
+          target.content = `出错了：${message}`
+        }
+      }
+    } finally {
+      isStreaming.value = false
+      controller.value = null
+    }
+  }
+
   function clearMessages() {
     if (isStreaming.value) return
     messages.value = [
@@ -123,6 +244,8 @@ export const useChatStore = defineStore('chat', () => {
     selectedMcpIds,
     selectedSkillIds,
     sendMessage,
+    debugSkillCreate,
+    debugMcpCreate,
     clearMessages,
     stopGeneration,
   }

@@ -22,6 +22,8 @@ const emit = defineEmits<{
   selectKey: [keyId: number]
   selectMcp: [mcpIds: number[]]
   selectSkill: [skillIds: number[]]
+  openSkillDebug: []
+  openMcpDebug: []
 }>()
 
 const input = ref('')
@@ -143,6 +145,8 @@ onMounted(async () => {
             {{ k.provider.toUpperCase() }} - {{ k.model || '默认' }}
           </option>
         </select>
+        <button type="button" class="btn-debug" @click="$emit('openSkillDebug')">新 Skill 调试</button>
+        <button type="button" class="btn-debug" @click="$emit('openMcpDebug')">新 MCP 调试</button>
         <div class="toolbar-spacer" />
         <button v-if="isStreaming" type="button" class="btn-stop" @click="$emit('stop')">
           停止生成
@@ -261,6 +265,22 @@ textarea:disabled {
 
 .toolbar-spacer {
   flex: 1;
+}
+
+.btn-debug {
+  padding: 4px 10px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: transparent;
+  color: #58a6ff;
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-debug:hover {
+  background: #1f6feb22;
+  border-color: #58a6ff;
 }
 
 button {

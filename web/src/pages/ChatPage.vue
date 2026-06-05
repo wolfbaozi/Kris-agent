@@ -4,6 +4,8 @@ import ChatWindow from '../components/chat/ChatWindow.vue'
 import KeysModal from '../components/KeysModal.vue'
 import McpModal from '../components/McpModal.vue'
 import SkillModal from '../components/SkillModal.vue'
+import SkillDebugModal from '../components/SkillDebugModal.vue'
+import McpDebugModal from '../components/McpDebugModal.vue'
 import { useRouter } from 'vue-router'
 import { useMcpStore } from '../stores/mcp'
 import { useSkillStore } from '../stores/skill'
@@ -12,6 +14,8 @@ const router = useRouter()
 const showKeys = ref(false)
 const showMcp = ref(false)
 const showSkill = ref(false)
+const showSkillDebug = ref(false)
+const showMcpDebug = ref(false)
 const mcpStore = useMcpStore()
 const skillStore = useSkillStore()
 
@@ -40,11 +44,16 @@ onMounted(() => {
       </div>
     </header>
     <main class="chat-main">
-      <ChatWindow />
+      <ChatWindow
+        @open-skill-debug="showSkillDebug = true"
+        @open-mcp-debug="showMcpDebug = true"
+      />
     </main>
     <KeysModal v-if="showKeys" @close="showKeys = false" />
     <McpModal v-if="showMcp" @close="showMcp = false" />
     <SkillModal v-if="showSkill" @close="showSkill = false" />
+    <SkillDebugModal v-if="showSkillDebug" @close="showSkillDebug = false" />
+    <McpDebugModal v-if="showMcpDebug" @close="showMcpDebug = false" />
   </div>
 </template>
 

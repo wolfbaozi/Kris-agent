@@ -24,6 +24,7 @@ services:
     container_name: kris-server
     restart: unless-stopped
     environment:
+      JAVA_OPTS: "-Xms256m -Xmx512m"
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: mysql
       DB_PORT: 3306

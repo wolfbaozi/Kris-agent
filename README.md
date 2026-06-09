@@ -1,47 +1,52 @@
 # Kris Agent
 
-Vue3 + TypeScript + Vite 前端，Node.js Express BFF 代理大模型 API，支持 MCP 工具扩展与自定义 Skill 调试。
+Vue3 + TypeScript + Vite 前端，Java Spring Boot 后端，支持 MCP 工具扩展、自定义 Skill 调试与文件管理。
 
 ## 快速启动
 
-### 1. 初始化数据库
+### 方式一：Docker 一键部署（推荐）
 
 ```bash
-cd server
-node setup.js          # 创建数据库和表结构
-node seed-mcp-skill.js  # 可选：导入种子数据（示例 MCP/Skill）
-```
-
-### 2. 配置环境变量
-
-```bash
-cd server
+# 1. 配置环境变量
 cp .env.example .env
-# 编辑 .env，填入数据库连接信息和 API Key
+# 编辑 .env，填入数据库连接信息和密钥
+
+# 2. 构建并启动
+docker compose up -d --build
 ```
 
-### 3. 安装依赖
+服务启动后访问 `http://localhost`。
+
+### 方式二：本地开发
+
+#### 1. 初始化数据库
 
 ```bash
-npm install              # 根目录安装 concurrently
-cd web && npm install
-cd ../server && npm install
+# 执行 deploy/init.sql 创建数据库和表结构
+mysql -u root -p < deploy/init.sql
 ```
 
-### 4. 启动
+#### 2. 启动后端
 
 ```bash
-npm run dev              # 根目录一条命令同时启动前后端
+cd kris-agent-server
+# 使用 IDE 或命令行运行 Spring Boot 应用
+mvn spring-boot:run
 ```
 
-或分别启动：
+后端地址：`http://localhost:3001`
+
+#### 3. 启动前端
 
 ```bash
-cd server && npm run dev    # 后端 http://localhost:3001
-cd web && npm run dev       # 前端 http://localhost:5173
+cd web
+npm install
+npm run dev
 ```
 
-浏览器打开 `http://localhost:5173`，注册账号后在页面中配置 API Key 即可开始对话。
+前端地址：`http://localhost:5173`
+
+浏览器打开前端地址，注册账号后在页面中配置 API Key 即可开始对话。
 
 ## 项目结构
 
@@ -50,60 +55,55 @@ Kris-agent/
 ├── web/                      # Vue3 + TypeScript 前端 (Vite)
 │   ├── src/
 │   │   ├── api/              # API 层：请求封装
-│   │   │   ├── index.ts      #   基础请求 + authApi + keysApi
-│   │   │   ├── chat.ts       #   流式聊天 SSE 接口
-│   │   │   ├── debug.ts      #   Skill/MCP 调试接口
-│   │   │   ├── skill.ts      #   Skill CRUD 接口
-│   │   │   └── mcp.ts        #   MCP CRUD 接口
 │   │   ├── stores/           # Pinia 状态管理
-│   │   │   ├── auth.ts       #   认证状态
-│   │   │   ├── chat.ts       #   聊天状态（核心 store）
-│   │   │   ├── skill.ts      #   Skill 列表状态
-│   │   │   └── mcp.ts        #   MCP 列表状态
 │   │   ├── components/       # 视图组件
 │   │   │   ├── chat/         #   聊天组件
-│   │   │   │   ├── ChatWindow.vue    消息列表容器
-│   │   │   │   ├── ChatInput.vue     输入框 + MCP/Skill 选择 + 调试入口
-│   │   │   │   └── ChatMessage.vue   单条消息气泡
-│   │   │   ├── KeysModal.vue         API Key 管理弹窗
-│   │   │   ├── McpModal.vue          MCP 管理弹窗（CRUD + 启禁用）
-│   │   │   ├── SkillModal.vue        Skill 管理弹窗（CRUD + 启禁用）
-│   │   │   ├── SkillDebugModal.vue   创建 Skill 并调试弹窗
-│   │   │   └── McpDebugModal.vue     创建 MCP 并调试弹窗
+│   │   │   │   ├── ChatWindow.vue
+│   │   │   │   ├── ChatInput.vue
+│   │   │   │   └── ChatMessage.vue   支持 Markdown 渲染与代码高亮
+│   │   │   ├── KeysModal.vue
+│   │   │   ├── McpModal.vue
+│   │   │   ├── SkillModal.vue
+│   │   │   └── ...
 │   │   ├── pages/            # 页面
-│   │   │   ├── ChatPage.vue         主对话页面
-│   │   │   └── LoginPage.vue        登录/注册页
-│   │   ├── router/index.ts   # 路由配置（含登录守卫）
-│   │   └── types/chat.ts     # 聊天的 TypeScript 类型
-│   └── vite.config.ts        # Vite 配置（/api 代理到 3001）
-├── server/                   # Node.js Express BFF 后端 (ESM)
-│   ├── index.js              #   入口：自动加载 routes/ 目录路由
-│   ├── db.js                 #   MySQL2 连接池
-│   ├── crypto.js             #   AES-256-GCM 加解密（存储 API Key）
-│   ├── middleware/auth.js    #   JWT 认证中间件
-│   ├── routes/               # 路由层（仅负责接口引入）
-│   │   ├── auth.js           #   /api/auth    注册/登录
-│   │   ├── apikeys.js        #   /api/apikeys API Key CRUD
-│   │   ├── chat.js           #   /api/chat    流式聊天
-│   │   ├── debug.js          #   /api/debug   Skill/MCP 创建并调试
-│   │   ├── mcps.js           #   /api/mcps    MCP CRUD + toggle
-│   │   └── skills.js         #   /api/skills  Skill CRUD + toggle
-│   ├── services/             # 业务服务层（处理接口逻辑）
-│   │   ├── chat.js           #   核心聊天：AI SDK 流式 + 工具调用
-│   │   ├── mcp-loader.js     #   MCP 工具加载（Stdio 子进程通信）
-│   │   └── skill-loader.js   #   Skill 加载（Tool 执行 / Prompt 拼装）
-│   └── mcp-examples/         # MCP 示例
-│       ├── package.json
-│       └── calculator-mcp.js # 计算器 MCP 示例
-└── deploy/
-    └── init.sql              # 数据库初始化 SQL
+│   │   ├── router/           # 路由配置
+│   │   └── types/            # TypeScript 类型定义
+│   └── package.json
+├── kris-agent-server/        # Java Spring Boot 后端 (JDK 8)
+│   ├── src/main/java/com/kris/agent/
+│   │   ├── config/           # 配置类 (Security, JWT, WebMvc)
+│   │   ├── controller/       # API 层
+│   │   ├── service/          # 业务逻辑层
+│   │   ├── mapper/           # MyBatis-Plus 数据访问层
+│   │   ├── entity/           # 实体类
+│   │   ├── dto/              # 数据传输对象
+│   │   └── security/         # 安全认证
+│   ├── src/main/resources/
+│   │   ├── application.yml   # 本地开发配置
+│   │   ├── application-docker.yml # 生产环境配置
+│   │   └── db/migration/     # Flyway 数据库迁移脚本
+│   ├── Dockerfile
+│   └── pom.xml
+├── deploy/
+│   └── init.sql              # 数据库初始化 SQL
+├── docker-compose.yml        # Docker 服务编排
+└── nginx.conf                # Nginx 反向代理配置
 ```
 
 ## 核心功能
 
 ### 流式对话
 
-支持 DeepSeek、OpenAI、豆包、火山引擎多种模型，SSE 流式输出，打字机效果。对话中可选择多个 MCP 和 Skill 扩展 AI 能力。
+支持 DeepSeek、OpenAI、豆包、火山引擎多种模型，SSE 流式输出，打字机效果。
+- **Markdown 渲染**：AI 返回的内容支持 Markdown 格式，代码块自动高亮。
+- **MCP/Skill 扩展**：对话中可选择多个 MCP 和 Skill 扩展 AI 能力。
+
+### 文件管理
+
+支持文件上传、下载、列表查询与删除。
+- 支持多种文件类型（.js, .json, .md, .txt, .yml 等）
+- 文件按用户隔离存储
+- 提供 RESTful API 接口
 
 ### MCP 管理
 
@@ -121,7 +121,6 @@ Kris-agent/
 ### Skill / MCP 一键调试
 
 在对话输入框底部提供"新 Skill 调试"和"新 MCP 调试"快捷入口：
-
 1. 在弹出的表单中填写配置信息和测试消息
 2. 点击"创建并调试"，系统自动创建记录并发送调试请求
 3. 调试结果（工具调用过程 / AI 回复）以对话消息形式直接展示在聊天窗口中
@@ -132,10 +131,15 @@ Kris-agent/
 |--------|---------------------------|----------------------|
 | POST   | `/api/auth/register`      | 用户注册              |
 | POST   | `/api/auth/login`         | 用户登录              |
+| GET    | `/api/auth/me`            | 获取当前用户信息      |
 | GET    | `/api/apikeys`            | API Key 列表          |
 | POST   | `/api/apikeys`            | 添加 API Key          |
 | PUT    | `/api/apikeys/:id`        | 更新 API Key          |
 | DELETE | `/api/apikeys/:id`        | 删除 API Key          |
+| POST   | `/api/files`              | 上传文件              |
+| GET    | `/api/files`              | 文件列表              |
+| GET    | `/api/files/:id/download` | 下载文件              |
+| DELETE | `/api/files/:id`          | 删除文件              |
 | POST   | `/api/chat`               | 流式聊天（SSE）       |
 | GET    | `/api/mcps`               | MCP 配置列表          |
 | POST   | `/api/mcps`               | 添加 MCP 配置         |
@@ -156,8 +160,9 @@ Kris-agent/
 | 字段           | 类型          | 说明       |
 |----------------|--------------|-----------|
 | id             | INT AUTO PK  | 主键       |
-| username       | VARCHAR(255) | 用户名(唯一) |
-| password_hash  | VARCHAR(255) | bcrypt 哈希 |
+| username       | VARCHAR(50)  | 用户名(唯一) |
+| password_hash  | VARCHAR(255) | BCrypt 哈希 |
+| role           | ENUM         | 角色       |
 | created_at     | TIMESTAMP    | 创建时间    |
 
 ### api_keys
@@ -165,10 +170,22 @@ Kris-agent/
 |----------------|--------------|-------------------|
 | id             | INT AUTO PK  | 主键               |
 | user_id        | INT FK       | 所属用户            |
-| provider       | VARCHAR(50)  | 提供商              |
-| encrypted_key  | TEXT         | AES-256-GCM 加密   |
+| provider       | VARCHAR(20)  | 提供商              |
+| encrypted_key  | VARCHAR(512) | AES 加密            |
 | model          | VARCHAR(100) | 模型名称            |
 | base_url       | VARCHAR(255) | 自定义 API 地址     |
+| created_at     | TIMESTAMP    | 创建时间             |
+
+### file_records
+| 字段           | 类型          | 说明              |
+|----------------|--------------|-------------------|
+| id             | INT AUTO PK  | 主键               |
+| user_id        | INT FK       | 所属用户            |
+| original_name  | VARCHAR(255) | 原始文件名          |
+| stored_name    | VARCHAR(255) | 存储文件名          |
+| file_path      | VARCHAR(500) | 访问路径            |
+| file_size      | BIGINT       | 文件大小            |
+| file_type      | VARCHAR(100) | MIME 类型           |
 | created_at     | TIMESTAMP    | 创建时间             |
 
 ### mcp_servers
@@ -176,7 +193,7 @@ Kris-agent/
 |----------------|------------------------------|-----------|
 | id             | INT AUTO PK                  | 主键       |
 | user_id        | INT FK                       | 所属用户    |
-| name           | VARCHAR(255)                 | MCP 名称   |
+| name           | VARCHAR(100)                 | MCP 名称   |
 | is_global      | TINYINT(1)                   | 是否全局    |
 | run_env        | ENUM(local,production,all)   | 运行环境    |
 | source_type    | ENUM(database,file)          | 来源类型    |
@@ -193,7 +210,7 @@ Kris-agent/
 |----------------|------------------------|--------------|
 | id             | INT AUTO PK            | 主键           |
 | user_id        | INT FK                 | 所属用户        |
-| name           | VARCHAR(255)           | Skill 名称     |
+| name           | VARCHAR(100)           | Skill 名称     |
 | is_global      | TINYINT(1)             | 是否全局        |
 | skill_type     | ENUM(tool,prompt)      | 类型           |
 | source_type    | ENUM(database,file)    | 来源类型        |
@@ -203,3 +220,30 @@ Kris-agent/
 | file_path      | VARCHAR(500)           | 文件路径        |
 | enabled        | TINYINT(1)             | 是否启用        |
 | created_at     | TIMESTAMP              | 创建时间        |
+
+## 安全配置
+
+- **JWT 时效**：默认 6 小时，超时需重新登录
+- **密码加密**：使用 Spring Security BCrypt
+- **API Key 存储**：AES-256 加密存储
+- **CORS**：生产环境通过 Nginx 统一代理
+
+## 生产环境部署
+
+1. 在服务器创建 `.env` 文件，配置以下变量：
+   ```env
+   DB_PASSWORD=your_db_password
+   DB_NAME=kris_agent
+   JWT_SECRET=your_jwt_secret_key_at_least_32_chars
+   ENCRYPTION_KEY=your_32_char_encryption_key
+   ```
+
+2. 执行部署命令：
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. 查看日志确认启动状态：
+   ```bash
+   docker logs -f kris-server
+   ```

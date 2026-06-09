@@ -1,96 +1,121 @@
 package com.kris.agent.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kris.agent.entity.FileRecord;
+import com.kris.agent.security.UserPrincipal;
+import com.kris.agent.service.FileService;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
+/**
+ * 文件管理控制器 —— 上传、列表、下载、删除
+ *
+ * 【前端类比】相当于前端文件管理功能的后端接口
+ * MultipartFile 是 Spring 对 multipart/form-data 的封装
+ * 【前端类比】相当于前端 FormData 里 append('file', file) 的那个 file
+ *
+ * 下载接口用 Resource + APPLICATION_OCTET_STREAM 返回二进制流
+ * 【前端类比】相当于前端创建 Blob URL 触发下载
+ */
 @RestController
 @RequestMapping("/api/files")
 public class FileController {
 
-    private static final Path UPLOAD_DIR = Paths.get("uploads");
-    private static final Set<String> ALLOWED_EXT = new HashSet<>(Arrays.asList(
-            ".js", ".json", ".md", ".txt", ".yml", ".yaml", ".mjs", ".ts"));
+    private final FileService fileService;
 
-    public FileController() {
-        try {
-            Files.createDirectories(UPLOAD_DIR);
-        } catch (IOException ignored) {
-        }
+    public FileController(FileService fileService) {
+        this.fileService = fileService;
     }
 
+    /**
+     * 上传文件 POST /api/files
+     * @RequestParam("file") 从 form-data 中取名为 file 的字段
+     * 【前端类比】相当于前端 FormData.get('file')
+     */
     @PostMapping
-    public ResponseEntity upload(@RequestParam("file") MultipartFile file,
-                                  Authentication authentication) {
+    public ResponseEntity<?> upload(@RequestParam("file") MultipartFile file,
+                                    Authentication authentication) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(errorMap("请选择要上传的文件"));
         }
-        String originalName = file.getOriginalFilename();
-        if (originalName == null || originalName.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(errorMap("文件名不能为空"));
-        }
-        int dotIndex = originalName.lastIndexOf('.');
-        String ext = dotIndex >= 0 ? originalName.substring(dotIndex).toLowerCase() : "";
-        if (!ALLOWED_EXT.contains(ext)) {
-            return ResponseEntity.badRequest().body(errorMap("不支持的文件类型"));
-        }
         try {
-            String uniqueName = System.currentTimeMillis() + "-" +
-                    (int) (Math.random() * 1e9) + "-" + originalName;
-            Path target = UPLOAD_DIR.resolve(uniqueName);
-            file.transferTo(target.toFile());
-
-            byte[] bytes = Files.readAllBytes(target);
-            String raw = new String(bytes, StandardCharsets.UTF_8);
-
-            Map<String, Object> result = new HashMap<>();
-            result.put("id", uniqueName);
-            result.put("name", originalName);
-            result.put("size", file.getSize());
-            result.put("path", "/uploads/" + uniqueName);
-            result.put("ext", ext);
-            if (".json".equals(ext)) {
-                result.put("data", new ObjectMapper().readTree(raw));
-            } else {
-                result.put("data", raw);
-            }
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(errorMap("文件解析失败: " + e.getMessage()));
+            Long userId = getUserId(authentication);
+            FileRecord record = fileService.upload(userId, file);
+            return ResponseEntity.ok(record);
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(errorMap("文件上传失败: " + e.getMessage()));
         }
     }
 
-    @GetMapping("/{filename}")
-    public ResponseEntity download(@PathVariable String filename,
-                                    Authentication authentication) {
-        Path filePath = UPLOAD_DIR.resolve(filename);
-        if (!Files.exists(filePath)) {
-            return ResponseEntity.status(404).body(errorMap("文件不存在"));
-        }
+    @GetMapping
+    public ResponseEntity<?> list(Authentication authentication) {
+        Long userId = getUserId(authentication);
+        List<FileRecord> records = fileService.list(userId);
+        return ResponseEntity.ok(records);
+    }
+
+    /**
+     * 下载文件 GET /api/files/{id}/download
+     * Content-Disposition: attachment 告诉浏览器这是下载文件（不是在线预览）
+     */
+    @GetMapping("/{id}/download")
+    public ResponseEntity<?> download(@PathVariable Long id,
+                                      Authentication authentication) {
         try {
-            byte[] bytes = Files.readAllBytes(filePath);
-            return ResponseEntity.ok(new String(bytes, StandardCharsets.UTF_8));
+            Long userId = getUserId(authentication);
+            FileRecord record = fileService.getById(userId, id);
+            if (record == null) {
+                return ResponseEntity.status(404).body(errorMap("文件不存在"));
+            }
+
+            Path filePath = Paths.get("uploads").resolve(record.getStoredName());
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (!resource.exists()) {
+                return ResponseEntity.status(404).body(errorMap("文件不存在"));
+            }
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + record.getOriginalName() + "\"")
+                    .body(resource);
         } catch (IOException e) {
-            return ResponseEntity.badRequest().body(errorMap("读取文件失败"));
+            return ResponseEntity.badRequest().body(errorMap("下载失败"));
         }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable Long id,
+                                    Authentication authentication) {
+        try {
+            Long userId = getUserId(authentication);
+            fileService.delete(userId, id);
+            return ResponseEntity.ok(Collections.singletonMap("message", "删除成功"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(errorMap(e.getMessage()));
+        }
+    }
+
+    private Long getUserId(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new RuntimeException("未登录");
+        }
+        return ((UserPrincipal) authentication.getPrincipal()).getId();
     }
 
     private Map<String, Object> errorMap(String msg) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("error", msg);
-        return map;
+        return Collections.singletonMap("error", msg);
     }
 }

@@ -10,6 +10,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collections;
 import java.util.Map;
 
+/**
+ * Skill 管理控制器 —— CRUD + 启用/禁用
+ *
+ * 【前端类比】相当于前端 Skill 管理页面的后端接口
+ * 结构与 McpController 完全一致（RESTful CRUD 的标准模式）
+ */
 @RestController
 @RequestMapping("/api/skills")
 public class SkillController {

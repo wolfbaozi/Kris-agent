@@ -21,7 +21,7 @@ mybatis-plus:
 app:
   jwt:
     secret: kris-agent-jwt-secret-2025-secure-key-32bytes
-    expiration: 604800000
+    expiration: 21600000
   encryption:
     key: 01234567890123456789012345678901
   run-env: local

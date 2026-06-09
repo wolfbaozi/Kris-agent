@@ -14,6 +14,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * MCP 服务器管理服务 —— CRUD + 启用/禁用
+ *
+ * 【前端类比】相当于前端的 useMcpServers() composable
+ *
+ * ObjectMapper 是 Java 的 JSON 工具（相当于 JSON.stringify / JSON.parse）
+ * args/env/config 在数据库里存 JSON 字符串，读写时需要序列化/反序列化
+ *
+ * 数据权限隔离：
+ *   - 每个用户只能操作自己的 MCP（where userId = ?）
+ *   - isGlobal = 1 的是全局 MCP，所有人可见
+ *   - 类似前端的"个人配置 vs 全局配置"
+ */
 @Service
 public class McpService {
 
@@ -28,6 +41,10 @@ public class McpService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 列表查询：只返回已启用的 + 匹配当前运行环境的 + 自己的或全局的
+     * 【前端类比】相当于前端列表页的过滤条件：enabled=true && (runEnv='all' || runEnv=current)
+     */
     public List<Map<String, Object>> list(Long userId) {
         LambdaQueryWrapper<McpServer> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(McpServer::getEnabled, 1)
@@ -41,6 +58,7 @@ public class McpService {
         if (request.getName() == null || request.getName().trim().isEmpty()) {
             throw new RuntimeException("MCP名称不能为空");
         }
+        // 重名校验（同一用户下名称唯一）
         LambdaQueryWrapper<McpServer> dupWrapper = new LambdaQueryWrapper<>();
         dupWrapper.eq(McpServer::getUserId, userId).eq(McpServer::getName, request.getName());
         if (mcpServerMapper.selectCount(dupWrapper) > 0) {
@@ -53,6 +71,7 @@ public class McpService {
         server.setSourceType(request.getSourceType() != null ? request.getSourceType() : "database");
         server.setServerType(request.getServerType() != null ? request.getServerType() : "");
         server.setCommand(request.getCommand() != null ? request.getCommand() : "");
+        // JSON 对象字段需要序列化为字符串存储（相当于 JSON.stringify）
         if (request.getArgs() != null) {
             try {
                 server.setArgs(objectMapper.writeValueAsString(request.getArgs()));
@@ -89,6 +108,7 @@ public class McpService {
         if (server == null) {
             throw new RuntimeException("MCP配置不存在或无权限修改");
         }
+        // 改名时检查新名称是否与其他记录冲突（排除自己）
         if (request.getName() != null && !request.getName().equals(server.getName())) {
             LambdaQueryWrapper<McpServer> dupWrapper = new LambdaQueryWrapper<>();
             dupWrapper.eq(McpServer::getUserId, userId)
@@ -129,6 +149,9 @@ public class McpService {
         mcpServerMapper.deleteById(id);
     }
 
+    /**
+     * 切换启用/禁用：enabled 在 0 和 1 之间翻转
+     */
     public Map<String, Object> toggle(Long userId, Long id) {
         LambdaQueryWrapper<McpServer> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(McpServer::getUserId, userId).eq(McpServer::getId, id);
@@ -144,6 +167,10 @@ public class McpService {
         return result;
     }
 
+    /**
+     * Entity -> Map 转换（控制返回给前端的字段）
+     * 全局 MCP 不暴露 command/args/env（安全考虑）
+     */
     private Map<String, Object> toMap(McpServer server, Long currentUserId) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", server.getId());

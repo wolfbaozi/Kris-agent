@@ -11,6 +11,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * API Key 管理服务 —— CRUD + 加密存储
+ *
+ * 【前端类比】相当于前端的 useApiKeys() composable
+ * 关键点：API Key 存入数据库前必须加密（AES-GCM），列表接口不返回密文
+ *
+ * stream() 是 Java 8 的流式 API（类似前端的 Array.map().filter()）
+ * .stream().map().collect() 相当于 arr.map().reduce()
+ */
 @Service
 public class ApiKeyService {
 
@@ -22,6 +31,10 @@ public class ApiKeyService {
         this.encryptionConfig = encryptionConfig;
     }
 
+    /**
+     * 列表查询：只返回元信息，不返回加密后的 key（安全考虑）
+     * 【前端类比】相当于前端列表页只展示 provider/model，不展示真实 key
+     */
     public List<Map<String, Object>> list(Long userId) {
         LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ApiKey::getUserId, userId);
@@ -37,6 +50,9 @@ public class ApiKeyService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * 创建：API Key 先加密再存数据库
+     */
     public ApiKey create(Long userId, ApiKeyRequest request) {
         ApiKey apiKey = new ApiKey();
         apiKey.setUserId(userId);
@@ -48,6 +64,10 @@ public class ApiKeyService {
         return apiKey;
     }
 
+    /**
+     * 更新：只更新传了的字段（部分更新）
+     * 先查出原记录，再按需修改字段，最后 updateById
+     */
     public void update(Long userId, Long id, ApiKeyRequest request) {
         LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ApiKey::getUserId, userId).eq(ApiKey::getId, id);

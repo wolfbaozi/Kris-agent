@@ -1,20 +1,4 @@
-import BASE from './index'
-
-async function request(url: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('token')
-  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers as Record<string, string>) }
-  if (token) headers['Authorization'] = 'Bearer ' + token
-  const res = await fetch(BASE + url, { ...options, headers })
-  if (!res.ok) {
-    let msg = '请求失败'
-    try {
-      const errData = await res.json()
-      msg = errData.error || msg
-    } catch {}
-    throw new Error(msg)
-  }
-  return res.json()
-}
+import { request } from './request'
 
 export interface McpConfig {
   id: number

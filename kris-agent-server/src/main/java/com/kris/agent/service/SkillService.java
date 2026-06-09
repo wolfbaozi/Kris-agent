@@ -13,6 +13,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Skill 管理服务 —— CRUD + 启用/禁用
+ *
+ * 【前端类比】相当于前端的 useSkills() composable
+ * 结构与 McpService 高度相似（标准的 CRUD Service 模式）
+ */
 @Service
 public class SkillService {
 
@@ -132,6 +138,10 @@ public class SkillService {
         return result;
     }
 
+    /**
+     * Entity -> Map 转换
+     * 全局 Skill 不暴露 toolSchema/toolCode（安全考虑，只返回 prompt 内容）
+     */
     private Map<String, Object> toMap(Skill skill, Long currentUserId) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", skill.getId());

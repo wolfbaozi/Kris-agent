@@ -10,6 +10,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collections;
 import java.util.Map;
 
+/**
+ * API Key 管理控制器 —— CRUD
+ *
+ * 【前端类比】相当于前端"API Key 设置"页面的后端接口
+ * 注意：列表接口不返回真实的 API Key（已加密存储），只返回 provider/model/baseUrl 等元信息
+ */
 @RestController
 @RequestMapping("/api/apikeys")
 public class ApiKeyController {

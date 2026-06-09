@@ -14,6 +14,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * AI 生成服务 —— 用 AI 自动生成 Skill/MCP 配置
+ *
+ * 【前端类比】相当于前端的"AI 辅助"功能：用户输入描述 -> 调 AI -> 返回结构化配置
+ * 核心思路：构造一个精心设计的 prompt，让 AI 返回指定格式的 JSON
+ * 然后用 ObjectMapper（类似 JSON.parse）把 AI 返回的字符串解析为 Map
+ */
 @Service
 public class AiGenService {
 
@@ -47,6 +54,7 @@ public class AiGenService {
 
         String jsonResult = callAi(userId, prompt);
         try {
+            // objectMapper.readValue 相当于 JSON.parse()
             return objectMapper.readValue(jsonResult, Map.class);
         } catch (Exception e) {
             throw new RuntimeException("AI 生成失败，返回格式不符");
@@ -75,6 +83,12 @@ public class AiGenService {
         }
     }
 
+    /**
+     * 调用 AI 的通用方法
+     * 1. 从数据库获取用户的 API Key（解密）
+     * 2. 创建 OpenAI 客户端
+     * 3. 发送请求并返回 AI 的文本回复
+     */
     private String callAi(Long userId, String prompt) {
         List<ApiKey> keys = apiKeyMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ApiKey>()

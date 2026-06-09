@@ -1,4 +1,4 @@
-FROM docker.m.daocloud.io/eclipse-temurin:17-jre-alpine
+FROM docker.m.daocloud.io/eclipse-temurin:8-jre-alpine
 
 WORKDIR /app
 

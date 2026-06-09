@@ -19,6 +19,32 @@ async function request(url: string, options: RequestInit = {}) {
 export const authApi = {
   login: (username: string, password: string) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   register: (username: string, password: string) => request('/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  me: () => request('/auth/me'),
+}
+
+export const aiGenApi = {
+  skill: (description: string) => {
+    const role = localStorage.getItem('role') || 'developer'
+    return request('/ai-gen/skill', { method: 'POST', body: JSON.stringify({ description, role }) })
+  },
+  mcp: (description: string) => {
+    const role = localStorage.getItem('role') || 'developer'
+    return request('/ai-gen/mcp', { method: 'POST', body: JSON.stringify({ description, role }) })
+  },
+}
+
+export const fileApi = {
+  upload: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const token = localStorage.getItem('token')
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = 'Bearer ' + token
+    return fetch('/api/files', { method: 'POST', headers, body: formData }).then((res) => {
+      if (!res.ok) throw new Error('上传失败')
+      return res.json()
+    })
+  },
 }
 
 export const keysApi = {

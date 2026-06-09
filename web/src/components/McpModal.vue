@@ -51,6 +51,16 @@ function openEdit(mcp: any) {
 
 async function save() {
   errorMsg.value = ''
+
+  const trimName = form.value.name.trim()
+  const duplicate = store.list.find(
+    (m) => m.name === trimName && m.id !== editingId.value
+  )
+  if (duplicate) {
+    errorMsg.value = `MCP名称"${trimName}"已存在`
+    return
+  }
+
   let args: string[] | undefined
   let env: Record<string, string> | undefined
   try {

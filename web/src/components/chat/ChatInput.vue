@@ -76,16 +76,31 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+const selectedKeyId = ref<number | null>(null)
+
+async function loadKeys() {
+  try {
+    keys.value = await keysApi.list()
+    if (keys.value.length > 0 && !selectedKeyId.value) {
+      selectedKeyId.value = keys.value[0].id
+      emit('selectKey', selectedKeyId.value)
+    }
+  } catch {}
+}
+
 function onSelectKey(e: Event) {
   const target = e.target as HTMLSelectElement
   const id = parseInt(target.value, 10)
-  if (id) emit('selectKey', id)
+  if (id) {
+    selectedKeyId.value = id
+    emit('selectKey', id)
+  }
 }
 
+defineExpose({ refreshKeys: loadKeys })
+
 onMounted(async () => {
-  try {
-    keys.value = await keysApi.list()
-  } catch {}
+  await loadKeys()
   mcpStore.fetchList()
   skillStore.fetchList()
 })
@@ -139,7 +154,7 @@ onMounted(async () => {
         @input="onInput"
       />
       <div class="input-toolbar">
-        <select v-if="keys.length > 0" class="model-select" @change="onSelectKey">
+        <select v-if="keys.length > 0" class="model-select" :value="selectedKeyId ?? ''" @change="onSelectKey">
           <option value="">选择模型</option>
           <option v-for="k in keys" :key="k.id" :value="k.id">
             {{ k.provider.toUpperCase() }} - {{ k.model || '默认' }}

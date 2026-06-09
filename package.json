@@ -2,21 +2,11 @@
   "name": "ai-agent-demo",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n server,web -c blue,green \"npm run dev --prefix server\" \"npm run dev --prefix web\"",
+    "dev": "concurrently -n server,web -c blue,green \"cd kris-agent-server && mvn spring-boot:run\" \"npm run dev --prefix web\"",
     "dev:web": "npm run dev --prefix web",
-    "dev:server": "npm run dev --prefix server"
+    "dev:server": "cd kris-agent-server && mvn spring-boot:run"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "bcryptjs": "^3.0.3",
-    "dotenv": "^17.4.2",
-    "jsonwebtoken": "^9.0.3",
-    "multer": "^2.1.1",
-    "mysql2": "^3.22.4",
-    "vue-router": "^4.6.4",
-    "zod": "^4.4.3"
   }
 }

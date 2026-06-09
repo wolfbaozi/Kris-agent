@@ -16,6 +16,7 @@ const showMcp = ref(false)
 const showSkill = ref(false)
 const showSkillDebug = ref(false)
 const showMcpDebug = ref(false)
+const chatWindowRef = ref<InstanceType<typeof ChatWindow> | null>(null)
 const mcpStore = useMcpStore()
 const skillStore = useSkillStore()
 
@@ -24,6 +25,11 @@ function logout() {
   localStorage.removeItem('username')
   localStorage.removeItem('userId')
   router.push('/login')
+}
+
+function onKeysModalClose() {
+  showKeys.value = false
+  chatWindowRef.value?.refreshInputKeys?.()
 }
 
 onMounted(() => {
@@ -45,11 +51,12 @@ onMounted(() => {
     </header>
     <main class="chat-main">
       <ChatWindow
+        ref="chatWindowRef"
         @open-skill-debug="showSkillDebug = true"
         @open-mcp-debug="showMcpDebug = true"
       />
     </main>
-    <KeysModal v-if="showKeys" @close="showKeys = false" />
+    <KeysModal v-if="showKeys" @close="onKeysModalClose" />
     <McpModal v-if="showMcp" @close="showMcp = false" />
     <SkillModal v-if="showSkill" @close="showSkill = false" />
     <SkillDebugModal v-if="showSkillDebug" @close="showSkillDebug = false" />

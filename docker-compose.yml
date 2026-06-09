@@ -19,13 +19,19 @@ services:
 
   server:
     build:
-      context: ./server
+      context: ./kris-agent-server
       dockerfile: Dockerfile
     container_name: kris-server
     restart: unless-stopped
-    env_file: ./server/.env
     environment:
+      SPRING_PROFILES_ACTIVE: docker
       DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME}
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
     depends_on:
       mysql:
         condition: service_healthy

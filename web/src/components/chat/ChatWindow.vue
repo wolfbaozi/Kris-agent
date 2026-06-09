@@ -15,6 +15,13 @@ const { messages, isStreaming, error, canSend } =
   storeToRefs(chatStore)
 
 const listRef = ref<HTMLElement | null>(null)
+const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
+
+function refreshInputKeys() {
+  chatInputRef.value?.refreshKeys?.()
+}
+
+defineExpose({ refreshInputKeys })
 
 async function scrollToBottom() {
   await nextTick()
@@ -55,6 +62,7 @@ watch(
     </main>
 
     <ChatInput
+      ref="chatInputRef"
       :disabled="!canSend"
       :is-streaming="isStreaming"
       @send="chatStore.sendMessage"

@@ -65,6 +65,15 @@ function openEdit(s: any) {
 async function save() {
   errorMsg.value = ''
 
+  const trimName = form.value.name.trim()
+  const duplicate = store.list.find(
+    (s) => s.name === trimName && s.id !== editingId.value
+  )
+  if (duplicate) {
+    errorMsg.value = `Skill名称"${trimName}"已存在`
+    return
+  }
+
   if (form.value.skillType === 'tool') {
     let properties = {}
     let required: string[] = []

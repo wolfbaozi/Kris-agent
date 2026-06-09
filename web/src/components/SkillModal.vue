@@ -22,8 +22,6 @@ const form = ref({
 const errorMsg = ref('')
 const isKris = auth.user?.username === 'Kris'
 
-const skillTypeLabel = computed(() => (form.value.skillType === 'tool' ? '函数式 Tool' : 'Prompt 指令'))
-
 async function loadList() {
   try {
     await store.fetchList()

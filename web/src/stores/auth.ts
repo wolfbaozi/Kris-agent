@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { md5 } from 'js-md5'
-import { authApi, aiGenApi, fileApi } from '../api/index'
+import { authApi } from '../api/index'
 
 export interface UserInfo {
   userId: number

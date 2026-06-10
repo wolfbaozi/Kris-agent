@@ -166,7 +166,7 @@ onMounted(async () => {
       <textarea
         ref="textRef"
         v-model="input"
-        :disabled="disabled"
+        :disabled="disabled || optimizeLoading"
         placeholder="输入问题，Enter 发送，Shift+Enter 换行"
         rows="1"
         @keydown="onKeydown"
@@ -180,12 +180,9 @@ onMounted(async () => {
           @click="optimizeInput"
           title="AI 优化输入"
         >
-          <svg v-if="!optimizeLoading" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
-          </svg>
-          <svg v-else class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-          </svg>
+          <img v-if="!optimizeLoading" src="/icons/ai-optimize.svg" alt="AI" />
+          <img v-else class="spin-icon" src="/icons/loading.svg" alt="loading" />
+          <span>AI 优化</span>
         </button>
         <select v-if="keys.length > 0" class="model-select" :value="selectedKeyId ?? ''" @change="onSelectKey">
           <option value="">选择模型</option>
@@ -197,7 +194,7 @@ onMounted(async () => {
         <button v-if="isStreaming" type="button" class="btn-stop" @click="$emit('stop')">
           停止生成
         </button>
-        <button type="button" class="btn-send" :disabled="disabled || !input.trim()" @click="submit">
+        <button type="button" class="btn-send" :disabled="disabled || optimizeLoading || !input.trim()" @click="submit">
           发送
         </button>
       </div>
@@ -348,19 +345,25 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  gap: 4px;
   height: 32px;
-  padding: 0;
-  border: 1px solid #30363d;
+  padding: 0 12px;
+  border: none;
   border-radius: 6px;
-  background: transparent;
-  color: #238636;
+  background: #238636;
+  color: #fff;
   cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.btn-optimize img {
+  width: 14px;
+  height: 14px;
 }
 
 .btn-optimize:hover:not(:disabled) {
-  background: #23863622;
-  border-color: #238636;
+  background: #2ea043;
 }
 
 .btn-optimize:disabled {

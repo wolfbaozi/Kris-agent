@@ -36,7 +36,7 @@ watch(
   <div class="chat-layout">
     <header class="header">
       <div>
-        <h1>AI Agent Demo</h1>
+        <h1>Kris Agent</h1>
         <p>Vue3 + TypeScript + Node BFF · 流式对话</p>
       </div>
       <div class="header-actions">

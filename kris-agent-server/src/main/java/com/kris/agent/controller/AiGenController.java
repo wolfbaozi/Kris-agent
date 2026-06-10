@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
+import java.util.Map;
 
 /**
  * AI 生成控制器 —— 用 AI 自动生成 Skill/MCP 配置
@@ -46,6 +47,18 @@ public class AiGenController {
         try {
             UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
             return ResponseEntity.ok(aiGenService.generateMcp(principal.getId(), request));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/optimize")
+    public ResponseEntity optimize(@RequestBody Map<String, String> body, Authentication authentication) {
+        try {
+            UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+            String text = body.get("text");
+            String result = aiGenService.optimizeText(principal.getId(), text);
+            return ResponseEntity.ok(Collections.singletonMap("text", result));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }

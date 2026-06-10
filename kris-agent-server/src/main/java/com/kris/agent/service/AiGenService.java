@@ -7,9 +7,15 @@ import com.kris.agent.entity.ApiKey;
 import com.kris.agent.mapper.ApiKeyMapper;
 import com.theokanning.openai.completion.chat.ChatCompletionRequest;
 import com.theokanning.openai.completion.chat.ChatMessage;
+import com.theokanning.openai.client.OpenAiApi;
 import com.theokanning.openai.service.OpenAiService;
+import okhttp3.OkHttpClient;
 import org.springframework.stereotype.Service;
+import retrofit2.Retrofit;
+import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
+import retrofit2.converter.jackson.JacksonConverterFactory;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -84,12 +90,12 @@ public class AiGenService {
     }
 
     /**
-     * 调用 AI 的通用方法
+     * 调用 AI 的通用方法（public，供其他 Service 复用）
      * 1. 从数据库获取用户的 API Key（解密）
-     * 2. 创建 OpenAI 客户端
+     * 2. 创建 OpenAI 客户端（支持自定义 baseUrl）
      * 3. 发送请求并返回 AI 的文本回复
      */
-    private String callAi(Long userId, String prompt) {
+    public String callAi(Long userId, String prompt) {
         List<ApiKey> keys = apiKeyMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ApiKey>()
                         .eq(ApiKey::getUserId, userId));
@@ -98,14 +104,58 @@ public class AiGenService {
         }
         ApiKey keyRec = keys.get(0);
         String apiKey = encryptionConfig.decrypt(keyRec.getEncryptedKey());
+        String baseUrl = keyRec.getBaseUrl();
+        String model = keyRec.getModel() != null ? keyRec.getModel() : "gpt-4o-mini";
 
-        OpenAiService service = new OpenAiService(apiKey);
+        OpenAiService service = buildService(apiKey, baseUrl);
+
         ChatMessage message = new ChatMessage("user", prompt);
         ChatCompletionRequest completionRequest = ChatCompletionRequest.builder()
-                .model("gpt-4o-mini")
+                .model(model)
                 .messages(Collections.singletonList(message))
                 .build();
         return service.createChatCompletion(completionRequest)
                 .getChoices().get(0).getMessage().getContent();
+    }
+
+    private OpenAiService buildService(String apiKey, String baseUrl) {
+        if (baseUrl != null && !baseUrl.isEmpty()) {
+            OkHttpClient client = new OkHttpClient.Builder()
+                    .addInterceptor(chain -> {
+                        okhttp3.Request request = chain.request().newBuilder()
+                                .addHeader("Authorization", "Bearer " + apiKey)
+                                .build();
+                        return chain.proceed(request);
+                    })
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .readTimeout(Duration.ofSeconds(120))
+                    .build();
+
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+            Retrofit retrofit = new Retrofit.Builder()
+                    .baseUrl(baseUrl)
+                    .client(client)
+                    .addConverterFactory(JacksonConverterFactory.create(mapper))
+                    .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+                    .build();
+            return new OpenAiService(retrofit.create(OpenAiApi.class));
+        }
+        return new OpenAiService(apiKey, Duration.ofSeconds(120));
+    }
+
+    public String optimizeText(Long userId, String text) {
+        if (text == null || text.trim().isEmpty()) {
+            throw new RuntimeException("请提供需要优化的文本");
+        }
+        String prompt = "你是一个文本优化助手。用户会输入一段功能描述，你的任务是将其优化为更清晰、更具体、更易于 AI 理解的描述。\n\n"
+                + "优化原则：\n"
+                + "1. 补充缺失的细节（输入、输出、使用场景）\n"
+                + "2. 消除歧义，使描述更精准\n"
+                + "3. 保持简洁，不添加多余内容\n"
+                + "4. 直接返回优化后的文本，不要加任何前缀说明\n\n"
+                + "用户原始描述: " + text.trim();
+        return callAi(userId, prompt);
     }
 }

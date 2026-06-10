@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue'
-import { keysApi } from '../../api/index'
+import { keysApi, aiOptimizeApi } from '../../api/index'
 import { useMcpStore } from '../../stores/mcp'
 import { useSkillStore } from '../../stores/skill'
 
@@ -22,8 +22,6 @@ const emit = defineEmits<{
   selectKey: [keyId: number]
   selectMcp: [mcpIds: number[]]
   selectSkill: [skillIds: number[]]
-  openSkillDebug: []
-  openMcpDebug: []
 }>()
 
 const input = ref('')
@@ -77,6 +75,7 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 const selectedKeyId = ref<number | null>(null)
+const optimizeLoading = ref(false)
 
 async function loadKeys() {
   try {
@@ -94,6 +93,20 @@ function onSelectKey(e: Event) {
   if (id) {
     selectedKeyId.value = id
     emit('selectKey', id)
+  }
+}
+
+async function optimizeInput() {
+  const text = input.value.trim()
+  if (!text) return
+  optimizeLoading.value = true
+  try {
+    const result = await aiOptimizeApi.optimize(text)
+    input.value = result.text
+    await nextTick()
+    adjustHeight()
+  } catch {} finally {
+    optimizeLoading.value = false
   }
 }
 
@@ -154,14 +167,26 @@ onMounted(async () => {
         @input="onInput"
       />
       <div class="input-toolbar">
+        <button
+          type="button"
+          class="btn-optimize"
+          :disabled="optimizeLoading || !input.trim()"
+          @click="optimizeInput"
+          title="AI 优化输入"
+        >
+          <svg v-if="!optimizeLoading" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+          </svg>
+          <svg v-else class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+          </svg>
+        </button>
         <select v-if="keys.length > 0" class="model-select" :value="selectedKeyId ?? ''" @change="onSelectKey">
           <option value="">选择模型</option>
           <option v-for="k in keys" :key="k.id" :value="k.id">
             {{ k.provider.toUpperCase() }} - {{ k.model || '默认' }}
           </option>
         </select>
-        <button type="button" class="btn-debug" @click="$emit('openSkillDebug')">新 Skill 调试</button>
-        <button type="button" class="btn-debug" @click="$emit('openMcpDebug')">新 MCP 调试</button>
         <div class="toolbar-spacer" />
         <button v-if="isStreaming" type="button" class="btn-stop" @click="$emit('stop')">
           停止生成
@@ -282,22 +307,6 @@ textarea:disabled {
   flex: 1;
 }
 
-.btn-debug {
-  padding: 4px 10px;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  background: transparent;
-  color: #58a6ff;
-  font-size: 11px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.btn-debug:hover {
-  background: #1f6feb22;
-  border-color: #58a6ff;
-}
-
 button {
   padding: 6px 14px;
   border: none;
@@ -327,5 +336,38 @@ button {
 
 .btn-stop:hover {
   background: #f85149;
+}
+
+.btn-optimize {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: transparent;
+  color: #238636;
+  cursor: pointer;
+}
+
+.btn-optimize:hover:not(:disabled) {
+  background: #23863622;
+  border-color: #238636;
+}
+
+.btn-optimize:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

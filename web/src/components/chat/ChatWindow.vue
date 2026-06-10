@@ -5,11 +5,6 @@ import { useChatStore } from '../../stores/chat'
 import ChatMessage from './ChatMessage.vue'
 import ChatInput from './ChatInput.vue'
 
-defineEmits<{
-  openSkillDebug: []
-  openMcpDebug: []
-}>()
-
 const chatStore = useChatStore()
 const { messages, isStreaming, error, canSend } =
   storeToRefs(chatStore)
@@ -70,8 +65,6 @@ watch(
       @select-key="chatStore.selectedKeyId = $event"
       @select-mcp="chatStore.selectedMcpIds = $event"
       @select-skill="chatStore.selectedSkillIds = $event"
-      @open-skill-debug="$emit('openSkillDebug')"
-      @open-mcp-debug="$emit('openMcpDebug')"
     />
   </div>
 </template>

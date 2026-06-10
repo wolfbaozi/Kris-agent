@@ -7,6 +7,9 @@ spring:
     username: root
     password: wolf8767
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai

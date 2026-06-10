@@ -32,13 +32,15 @@ public class McpService {
 
     private final McpServerMapper mcpServerMapper;
     private final ObjectMapper objectMapper;
+    private final AiGenService aiGenService;
 
     @Value("${app.run-env:production}")
     private String currentEnv;
 
-    public McpService(McpServerMapper mcpServerMapper, ObjectMapper objectMapper) {
+    public McpService(McpServerMapper mcpServerMapper, ObjectMapper objectMapper, AiGenService aiGenService) {
         this.mcpServerMapper = mcpServerMapper;
         this.objectMapper = objectMapper;
+        this.aiGenService = aiGenService;
     }
 
     /**
@@ -99,6 +101,82 @@ public class McpService {
         result.put("id", server.getId());
         result.put("name", server.getName());
         return result;
+    }
+
+    /**
+     * 通过自然语言描述 + AI 生成来创建 MCP
+     * 适用于产品经理等不写代码的角色
+     */
+    public Map<String, Object> createFromDescription(Long userId, String description, String role) {
+        if (description == null || description.trim().isEmpty()) {
+            throw new RuntimeException("请提供 MCP 功能描述");
+        }
+        String safeRole = (role == null || role.trim().isEmpty()) ? "developer" : role;
+        String roleGuide = "product_manager".equals(safeRole)
+                ? "用户是产品经理，不会写代码。请把配置名称做成中文友好的，command 和 args 尽量简单。"
+                : "designer".equals(safeRole)
+                ? "用户是设计师，请把配置名称做成中文友好的。"
+                : "用户是开发者，生成精准的技术配置。";
+
+        String prompt = "你是一个 MCP 服务器配置生成器。根据用户的自然语言描述，生成一个 MCP 配置。\n"
+                + roleGuide + "\n\n"
+                + "只返回纯 JSON，不要包含 markdown 代码块标记，格式如下：\n"
+                + "{\"name\":\"中文名称\",\"runEnv\":\"all\",\"command\":\"启动命令\",\"args\":[\"参数1\"],\"env\":{}}\n\n"
+                + "常见 MCP 示例：\n"
+                + "- 文件系统: {\"name\":\"文件系统\",\"runEnv\":\"all\",\"command\":\"npx\",\"args\":[\"-y\",\"@modelcontextprotocol/server-filesystem\",\"/path\"]}\n"
+                + "- 数据库: {\"name\":\"SQLite数据库\",\"runEnv\":\"all\",\"command\":\"npx\",\"args\":[\"-y\",\"@modelcontextprotocol/server-sqlite\",\"/path/db.sqlite\"]}\n"
+                + "- 网页抓取: {\"name\":\"网页抓取\",\"runEnv\":\"all\",\"command\":\"npx\",\"args\":[\"-y\",\"@modelcontextprotocol/server-fetch\"]}\n\n"
+                + "用户描述: " + description.trim();
+
+        String jsonResult = aiGenService.callAi(userId, prompt);
+        String cleaned = jsonResult.replaceAll("```json\\s*", "").replaceAll("```\\s*", "").trim();
+        try {
+            Map aiResult = objectMapper.readValue(cleaned, Map.class);
+            McpRequest req = new McpRequest();
+            req.setName((String) aiResult.get("name"));
+            req.setRunEnv((String) aiResult.getOrDefault("runEnv", "all"));
+            req.setCommand((String) aiResult.get("command"));
+            req.setSourceType("ai_gen");
+            Object argsObj = aiResult.get("args");
+            if (argsObj instanceof java.util.List) {
+                @SuppressWarnings("unchecked")
+                java.util.List<String> argsList = (java.util.List<String>) argsObj;
+                req.setArgs(argsList);
+            }
+            Object envObj = aiResult.get("env");
+            if (envObj instanceof Map) {
+                req.setEnv(envObj);
+            }
+            return create(userId, req);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("AI 生成结果解析失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 通过文件内容创建 MCP
+     * JSON 文件 -> 直接解析为 McpRequest
+     * 文本文件 -> 当作描述，调用 AI 生成
+     */
+    public Map<String, Object> createFromFile(Long userId, String fileName, String fileContent, String role) {
+        if (fileName == null || fileContent == null || fileContent.trim().isEmpty()) {
+            throw new RuntimeException("文件内容为空");
+        }
+        String lowerName = fileName.toLowerCase();
+        if (lowerName.endsWith(".json")) {
+            try {
+                McpRequest req = objectMapper.readValue(fileContent, McpRequest.class);
+                if (req.getSourceType() == null) req.setSourceType("file");
+                return create(userId, req);
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeException("JSON 文件解析失败: " + e.getMessage());
+            }
+        }
+        return createFromDescription(userId, fileContent, role);
     }
 
     public void update(Long userId, Long id, McpRequest request) {
@@ -167,6 +245,34 @@ public class McpService {
         return result;
     }
 
+    public Map<String, Object> export(Long userId, Long id) {
+        LambdaQueryWrapper<McpServer> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(McpServer::getUserId, userId).eq(McpServer::getId, id);
+        McpServer server = mcpServerMapper.selectOne(wrapper);
+        if (server == null) {
+            throw new RuntimeException("MCP配置不存在或无权限导出");
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("name", server.getName());
+        data.put("runEnv", server.getRunEnv());
+        data.put("command", server.getCommand());
+        try {
+            data.put("args", server.getArgs() != null 
+                ? objectMapper.readValue(server.getArgs(), List.class) 
+                : null);
+        } catch (Exception e) {
+            data.put("args", null);
+        }
+        try {
+            data.put("env", server.getEnv() != null 
+                ? objectMapper.readValue(server.getEnv(), Map.class) 
+                : null);
+        } catch (Exception e) {
+            data.put("env", null);
+        }
+        return data;
+    }
+
     /**
      * Entity -> Map 转换（控制返回给前端的字段）
      * 全局 MCP 不暴露 command/args/env（安全考虑）
@@ -186,8 +292,20 @@ public class McpService {
         map.put("createdAt", server.getCreatedAt());
         if (server.getIsGlobal() != 1 && server.getUserId().equals(currentUserId)) {
             map.put("command", server.getCommand());
-            map.put("args", server.getArgs());
-            map.put("env", server.getEnv());
+            try {
+                map.put("args", server.getArgs() != null 
+                    ? objectMapper.readValue(server.getArgs(), List.class) 
+                    : null);
+            } catch (Exception e) {
+                map.put("args", null);
+            }
+            try {
+                map.put("env", server.getEnv() != null 
+                    ? objectMapper.readValue(server.getEnv(), Map.class) 
+                    : null);
+            } catch (Exception e) {
+                map.put("env", null);
+            }
         }
         return map;
     }

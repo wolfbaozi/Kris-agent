@@ -47,7 +47,7 @@ public class AuthService {
         if (request.getPassword().length() != 32) {
             throw new RuntimeException("密码格式错误");
         }
-        // LambdaQueryWrapper 相当于 Prisma 的 where: { username: xxx }
+        String role = normalizeRole(request.getRole());
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getUsername, request.getUsername());
         if (userMapper.selectCount(wrapper) > 0) {
@@ -55,12 +55,23 @@ public class AuthService {
         }
         User user = new User();
         user.setUsername(request.getUsername());
-        // BCrypt 加密：明文 -> 哈希值（不可逆，每次加密结果不同但验证一致）
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        user.setRole("developer");
+        user.setRole(role);
         userMapper.insert(user);
         String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername());
-        return new AuthResponse(token, user.getId(), user.getUsername(), "developer");
+        return new AuthResponse(token, user.getId(), user.getUsername(), role);
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null || role.trim().isEmpty()) return "developer";
+        switch (role) {
+            case "product_manager":
+            case "designer":
+            case "developer":
+                return role;
+            default:
+                return "developer";
+        }
     }
 
     /**

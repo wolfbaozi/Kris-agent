@@ -9,15 +9,22 @@ const auth = useAuthStore()
 const isRegister = ref(false)
 const username = ref('')
 const password = ref('')
+const role = ref('developer')
 const errorMsg = ref('')
 const loading = ref(false)
+
+const roleOptions = [
+  { value: 'developer', label: '开发者', desc: '可以编写代码和技术配置' },
+  { value: 'product_manager', label: '产品经理', desc: '用文字描述需求，AI 自动生成配置' },
+  { value: 'designer', label: '设计师', desc: '用文字描述需求，AI 自动生成配置' },
+]
 
 async function submit() {
   errorMsg.value = ''
   loading.value = true
   try {
     if (isRegister.value) {
-      await auth.register(username.value, password.value)
+      await auth.register(username.value, password.value, role.value)
     } else {
       await auth.login(username.value, password.value)
     }
@@ -42,6 +49,21 @@ function toggleMode() {
       <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
       <input v-model="username" placeholder="用户名" />
       <input v-model="password" type="password" placeholder="密码（至少6位）" @keyup.enter="submit" />
+      <div v-if="isRegister" class="role-section">
+        <label class="role-label">选择你的角色</label>
+        <div class="role-options">
+          <div
+            v-for="opt in roleOptions"
+            :key="opt.value"
+            class="role-option"
+            :class="{ active: role === opt.value }"
+            @click="role = opt.value"
+          >
+            <div class="role-name">{{ opt.label }}</div>
+            <div class="role-desc">{{ opt.desc }}</div>
+          </div>
+        </div>
+      </div>
       <button :disabled="loading || !username || !password" @click="submit">
         {{ loading ? '请稍候...' : (isRegister ? '注册' : '登录') }}
       </button>
@@ -63,7 +85,7 @@ function toggleMode() {
 }
 
 .auth-card {
-  width: 360px;
+  width: 380px;
   padding: 32px;
   border: 1px solid #30363d;
   border-radius: 12px;
@@ -99,6 +121,52 @@ input {
 input:focus {
   outline: none;
   border-color: #58a6ff;
+}
+
+.role-section {
+  margin-bottom: 12px;
+}
+
+.role-label {
+  display: block;
+  font-size: 13px;
+  color: #8b949e;
+  margin-bottom: 8px;
+}
+
+.role-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.role-option {
+  padding: 10px 12px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.role-option:hover {
+  border-color: #58a6ff;
+}
+
+.role-option.active {
+  border-color: #58a6ff;
+  background: #1f6feb22;
+}
+
+.role-name {
+  font-size: 14px;
+  color: #e6edf3;
+  font-weight: 500;
+}
+
+.role-desc {
+  font-size: 12px;
+  color: #8b949e;
+  margin-top: 2px;
 }
 
 button {

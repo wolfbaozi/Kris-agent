@@ -1,15 +1,25 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useSkillStore } from '../stores/skill'
 import { useAuthStore } from '../stores/auth'
+import { useRoleOptionStore } from '../stores/roleOption'
+import { skillApi } from '../api/index'
 
 const store = useSkillStore()
 const auth = useAuthStore()
+const roleStore = useRoleOptionStore()
 
 defineEmits<{ (e: 'close'): void }>()
 
 const showForm = ref(false)
 const editingId = ref<number | null>(null)
+const errorMsg = ref('')
+const aiLoading = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const useAiMode = ref(true)
+
+const isDeveloper = computed(() => auth.role === 'developer')
+
 const form = ref({
   name: '',
   skillType: 'tool' as 'tool' | 'prompt',
@@ -19,7 +29,12 @@ const form = ref({
   toolCode: '',
   promptContent: '',
 })
-const errorMsg = ref('')
+
+const simpleForm = ref({
+  description: '',
+  role: auth.role || 'developer',
+})
+
 const isKris = auth.user?.username === 'Kris'
 
 async function loadList() {
@@ -36,32 +51,39 @@ function openAdd() {
     name: '', skillType: 'tool', description: '', propertiesText: '',
     requiredText: '', toolCode: '', promptContent: '',
   }
+  simpleForm.value = { description: '', role: auth.role || 'developer' }
+  useAiMode.value = true
   showForm.value = true
   errorMsg.value = ''
 }
 
 function openEdit(s: any) {
-  if (s.is_global && !isKris) return
+  if ((s.isGlobal || s.is_global) && !isKris) return
   editingId.value = s.id
   form.value = {
     name: s.name,
-    skillType: s.skill_type,
-    description: s.tool_schema?.description || '',
-    propertiesText: s.tool_schema?.parameters
-      ? JSON.stringify(s.tool_schema.parameters.properties || {})
-      : '',
-    requiredText: s.tool_schema?.parameters?.required
-      ? JSON.stringify(s.tool_schema.parameters.required)
-      : '',
-    toolCode: s.tool_code || '',
-    promptContent: s.prompt_content || '',
+    skillType: s.skillType || s.skill_type,
+    description: s.toolSchema?.description || s.tool_schema?.description || '',
+    propertiesText: s.toolSchema?.parameters?.properties
+      ? JSON.stringify(s.toolSchema.parameters.properties)
+      : (s.tool_schema?.parameters?.properties ? JSON.stringify(s.tool_schema.parameters.properties) : ''),
+    requiredText: s.toolSchema?.parameters?.required
+      ? JSON.stringify(s.toolSchema.parameters.required)
+      : (s.tool_schema?.parameters?.required ? JSON.stringify(s.tool_schema.parameters.required) : ''),
+    toolCode: s.toolCode || s.tool_code || '',
+    promptContent: s.promptContent || s.prompt_content || '',
   }
+  useAiMode.value = false
   showForm.value = true
   errorMsg.value = ''
 }
 
 async function save() {
   errorMsg.value = ''
+
+  if (!isDeveloper.value && !editingId.value) {
+    return
+  }
 
   const trimName = form.value.name.trim()
   const duplicate = store.list.find(
@@ -144,6 +166,47 @@ async function save() {
   }
 }
 
+async function aiCreate() {
+  errorMsg.value = ''
+  const desc = simpleForm.value.description.trim()
+  if (!desc) {
+    errorMsg.value = '请描述你想要的 Skill 功能'
+    return
+  }
+  aiLoading.value = true
+  try {
+    await skillApi.aiCreate(desc, simpleForm.value.role)
+    await store.fetchList()
+    showForm.value = false
+  } catch (e: any) {
+    errorMsg.value = e.message
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+function triggerFileUpload() {
+  fileInputRef.value?.click()
+}
+
+async function handleFileUpload(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  errorMsg.value = ''
+  aiLoading.value = true
+  try {
+    await skillApi.upload(file, simpleForm.value.role)
+    await store.fetchList()
+    showForm.value = false
+  } catch (e: any) {
+    errorMsg.value = e.message
+  } finally {
+    aiLoading.value = false
+    input.value = ''
+  }
+}
+
 async function deleteSkill(id: number) {
   if (!confirm('确定删除该 Skill？')) return
   try {
@@ -161,7 +224,32 @@ async function toggleSkill(id: number) {
   }
 }
 
-onMounted(loadList)
+async function exportSkill(id: number) {
+  try {
+    const token = localStorage.getItem('token')
+    const response = await fetch(`/api/skills/${id}/export`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (!response.ok) throw new Error('导出失败')
+    const blob = await response.blob()
+    const disposition = response.headers.get('Content-Disposition')
+    const filenameMatch = disposition?.match(/filename="(.+)"/)
+    const filename = filenameMatch ? filenameMatch[1] : `skill-${id}.json`
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    errorMsg.value = e.message
+  }
+}
+
+onMounted(() => {
+  loadList()
+  roleStore.fetchList()
+})
 </script>
 
 <template>
@@ -180,8 +268,9 @@ onMounted(loadList)
         <div v-for="s in store.list" :key="s.id" class="card">
           <div class="card-info">
             <span class="name">{{ s.name }}</span>
-            <span v-if="s.is_global" class="tag-global">全局</span>
-            <span class="tag type-tag">{{ s.skill_type === 'tool' ? 'Tool' : 'Prompt' }}</span>
+            <span v-if="s.isGlobal || s.is_global" class="tag-global">全局</span>
+            <span class="tag type-tag">{{ (s.skillType || s.skill_type) === 'tool' ? 'Tool' : 'Prompt' }}</span>
+            <span v-if="(s.sourceType || s.source_type) === 'ai_gen'" class="tag ai-tag">AI</span>
             <span v-if="!s.enabled" class="tag tag-off">已禁用</span>
           </div>
           <div class="card-actions">
@@ -189,14 +278,21 @@ onMounted(loadList)
               {{ s.enabled ? '禁用' : '启用' }}
             </button>
             <button
-              v-if="!s.is_global || isKris"
+              v-if="!(s.isGlobal || s.is_global) || isKris"
+              class="btn-outline-sm"
+              @click="exportSkill(s.id)"
+            >
+              导出
+            </button>
+            <button
+              v-if="!(s.isGlobal || s.is_global) || isKris"
               class="btn-outline-sm"
               @click="openEdit(s)"
             >
               编辑
             </button>
             <button
-              v-if="!s.is_global || isKris"
+              v-if="!(s.isGlobal || s.is_global) || isKris"
               class="btn-danger-sm"
               @click="deleteSkill(s.id)"
             >
@@ -212,53 +308,123 @@ onMounted(loadList)
         <div class="modal form-modal">
           <h2>{{ editingId ? '编辑' : '添加' }} Skill</h2>
 
-          <label>Skill 名称</label>
-          <input v-model="form.name" placeholder="如：代码审查" />
-
-          <label>类型</label>
-          <select v-model="form.skillType" :disabled="!!editingId">
-            <option value="tool">函数式 Tool</option>
-            <option value="prompt">Prompt 指令</option>
-          </select>
-
-          <template v-if="form.skillType === 'tool'">
-            <label>功能描述</label>
-            <input v-model="form.description" placeholder="描述此 Tool 的功能" />
-
-            <label>参数 Schema（JSON 对象，key=参数名，value={type,description}）</label>
-            <input
-              v-model="form.propertiesText"
-              placeholder='{"expression": {"type": "string", "description": "数学表达式"}}'
-            />
-
-            <label>必填参数（JSON 数组，可选）</label>
-            <input
-              v-model="form.requiredText"
-              placeholder='["expression"]'
-            />
-
-            <label>执行代码（函数体，可用 params 访问参数）</label>
-            <textarea
-              v-model="form.toolCode"
-              placeholder="return { result: eval(params.expression) };"
-              rows="4"
-              class="code-input"
-            />
+          <template v-if="!editingId && isDeveloper">
+            <div class="mode-switch">
+              <button
+                class="mode-btn"
+                :class="{ active: useAiMode }"
+                @click="useAiMode = true"
+              >
+                AI 生成
+              </button>
+              <button
+                class="mode-btn"
+                :class="{ active: !useAiMode }"
+                @click="useAiMode = false"
+              >
+                手动填写
+              </button>
+            </div>
           </template>
 
-          <template v-else>
-            <label>Prompt 指令内容</label>
+          <template v-if="!editingId && useAiMode">
+            <div class="mode-hint">
+              用文字描述你想要的功能，AI 会自动生成 Skill 配置
+            </div>
+
+            <label>角色身份</label>
+            <select v-model="simpleForm.role">
+              <option v-for="opt in roleStore.list" :key="opt.roleKey" :value="opt.roleKey">
+                {{ opt.roleLabel }}
+              </option>
+            </select>
+
+            <label>功能描述</label>
             <textarea
-              v-model="form.promptContent"
-              placeholder="你是一名专业的代码审查员..."
-              rows="6"
+              v-model="simpleForm.description"
+              placeholder="例如：帮我写一个能够自动总结会议内容的工具，输入会议文字记录，输出结构化的会议纪要..."
+              rows="5"
               class="code-input"
             />
+
+            <div class="ai-actions">
+              <button
+                class="btn-ai"
+                :disabled="aiLoading || !simpleForm.description.trim()"
+                @click="aiCreate"
+              >
+                {{ aiLoading ? 'AI 生成中...' : 'AI 智能生成' }}
+              </button>
+              <span class="or-text">或</span>
+              <button class="btn-upload" @click="triggerFileUpload" :disabled="aiLoading">
+                上传配置文件
+              </button>
+              <input
+                ref="fileInputRef"
+                type="file"
+                accept=".json,.txt,.md"
+                style="display: none"
+                @change="handleFileUpload"
+              />
+            </div>
+          </template>
+
+          <template v-if="editingId || (!editingId && !useAiMode && isDeveloper)">
+            <label>Skill 名称</label>
+            <input v-model="form.name" placeholder="如：代码审查" />
+
+            <label>类型</label>
+            <select v-model="form.skillType" :disabled="!!editingId">
+              <option value="tool">函数式 Tool</option>
+              <option value="prompt">Prompt 指令</option>
+            </select>
+
+            <template v-if="form.skillType === 'tool'">
+              <label>功能描述</label>
+              <input v-model="form.description" placeholder="描述此 Tool 的功能" />
+
+              <label>参数 Schema（JSON 对象）</label>
+              <input
+                v-model="form.propertiesText"
+                placeholder='{"expression": {"type": "string", "description": "数学表达式"}}'
+              />
+
+              <label>必填参数（JSON 数组，可选）</label>
+              <input
+                v-model="form.requiredText"
+                placeholder='["expression"]'
+              />
+
+              <label>执行代码（函数体，可用 params 访问参数）</label>
+              <textarea
+                v-model="form.toolCode"
+                placeholder="return { result: eval(params.expression) };"
+                rows="4"
+                class="code-input"
+              />
+            </template>
+
+            <template v-else>
+              <label>Prompt 指令内容</label>
+              <textarea
+                v-model="form.promptContent"
+                placeholder="你是一名专业的代码审查员..."
+                rows="6"
+                class="code-input"
+              />
+            </template>
           </template>
 
           <div class="modal-actions">
             <button class="btn-outline" @click="showForm = false">取消</button>
-            <button class="btn-primary" :disabled="!form.name" @click="save">保存</button>
+            <button
+              v-if="editingId || (!useAiMode && isDeveloper)"
+              class="btn-primary"
+              :disabled="!form.name"
+              @click="save"
+            >
+              保存
+            </button>
           </div>
         </div>
       </div>
@@ -368,6 +534,10 @@ onMounted(loadList)
   background: #30363d;
   color: #8b949e;
 }
+.ai-tag {
+  background: #238636;
+  color: #fff;
+}
 .tag-off {
   background: #da363322;
   color: #da3633;
@@ -391,12 +561,42 @@ onMounted(loadList)
   background: #1f6feb22;
 }
 .form-modal {
-  width: 440px;
+  width: 480px;
   position: relative;
+  max-height: 85vh;
+  overflow-y: auto;
 }
 .form-modal h2 {
   margin: 0 0 12px;
   font-size: 16px;
+  color: #e6edf3;
+}
+.mode-switch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 4px;
+  background: #0d1117;
+}
+.mode-btn {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8b949e;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.mode-btn.active {
+  background: #238636;
+  color: #fff;
+}
+.mode-btn:hover:not(.active) {
+  background: #30363d;
   color: #e6edf3;
 }
 label {
@@ -434,6 +634,56 @@ textarea:focus {
   font-family: monospace;
   resize: vertical;
   box-sizing: border-box;
+}
+.mode-hint {
+  font-size: 13px;
+  color: #8b949e;
+  margin-bottom: 12px;
+  padding: 10px;
+  background: #0d1117;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+}
+.ai-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.btn-ai {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #238636, #1f6feb);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-ai:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-upload {
+  padding: 8px 14px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: transparent;
+  color: #c9d1d9;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-upload:hover {
+  background: #30363d;
+}
+.btn-upload:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.or-text {
+  color: #8b949e;
+  font-size: 13px;
 }
 .modal-actions {
   display: flex;

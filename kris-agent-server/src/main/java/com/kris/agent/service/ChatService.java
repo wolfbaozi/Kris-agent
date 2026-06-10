@@ -1,5 +1,6 @@
 package com.kris.agent.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kris.agent.config.EncryptionConfig;
 import com.kris.agent.dto.ChatRequest;
 import com.kris.agent.entity.ApiKey;
@@ -43,15 +44,17 @@ public class ChatService {
     private final ApiKeyMapper apiKeyMapper;
     private final SkillMapper skillMapper;
     private final EncryptionConfig encryptionConfig;
+    private final McpRuntimeService mcpRuntimeService;
 
     @Value("${app.run-env:production}")
     private String currentEnv;
 
     public ChatService(ApiKeyMapper apiKeyMapper, SkillMapper skillMapper,
-                       EncryptionConfig encryptionConfig) {
+                       EncryptionConfig encryptionConfig, McpRuntimeService mcpRuntimeService) {
         this.apiKeyMapper = apiKeyMapper;
         this.skillMapper = skillMapper;
         this.encryptionConfig = encryptionConfig;
+        this.mcpRuntimeService = mcpRuntimeService;
     }
 
     /**
@@ -131,7 +134,6 @@ public class ChatService {
      */
     private OpenAiService buildService(String apiKey, String baseUrl) {
         if (baseUrl != null && !baseUrl.isEmpty()) {
-            // OkHttp 拦截器：每个请求自动带上 Authorization header
             OkHttpClient client = new OkHttpClient.Builder()
                     .addInterceptor(chain -> {
                         Request request = chain.request().newBuilder()
@@ -143,10 +145,13 @@ public class ChatService {
                     .readTimeout(Duration.ofSeconds(300))
                     .build();
 
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
             Retrofit retrofit = new Retrofit.Builder()
                     .baseUrl(baseUrl)
                     .client(client)
-                    .addConverterFactory(JacksonConverterFactory.create())
+                    .addConverterFactory(JacksonConverterFactory.create(mapper))
                     .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                     .build();
             return new OpenAiService(retrofit.create(OpenAiApi.class));
@@ -174,6 +179,25 @@ public class ChatService {
         return skills.stream()
                 .map(s -> "## " + s.getName() + "\n" + s.getPromptContent())
                 .collect(Collectors.joining("\n\n"));
+    }
+
+    private String buildMcpToolsDescription(Long userId, List<Long> mcpIds) {
+        if (mcpIds == null || mcpIds.isEmpty()) return null;
+
+        StringBuilder sb = new StringBuilder();
+        for (Long mcpId : mcpIds) {
+            try {
+                List<Map<String, Object>> tools = mcpRuntimeService.listTools(userId, mcpId);
+                for (Map<String, Object> tool : tools) {
+                    sb.append("- ").append(tool.get("name"));
+                    if (tool.get("description") != null) {
+                        sb.append(": ").append(tool.get("description"));
+                    }
+                    sb.append("\n");
+                }
+            } catch (Exception ignored) {}
+        }
+        return sb.length() > 0 ? sb.toString() : null;
     }
 
     private void sendEvent(SseEmitter emitter, String type, Map<String, Object> data) throws IOException {

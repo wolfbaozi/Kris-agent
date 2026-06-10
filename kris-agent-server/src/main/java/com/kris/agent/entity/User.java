@@ -32,6 +32,10 @@ public class User {
 
     private String role;
 
+    private Integer maxMcpCount;
+
+    private Integer maxConcurrentMcp;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }

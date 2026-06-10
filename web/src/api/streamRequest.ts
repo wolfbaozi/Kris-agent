@@ -18,6 +18,16 @@ async function parseStreamError(res: Response): Promise<string> {
   }
 }
 
+function handleUnauthorized() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('username')
+  localStorage.removeItem('userId')
+  localStorage.removeItem('role')
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login'
+  }
+}
+
 function parseSSELine(line: string): StreamChunk | null {
   if (!line.startsWith('data:')) return null
   const payload = line.slice(5).trim()
@@ -62,6 +72,11 @@ export async function streamRequest(
     body: JSON.stringify(body),
     signal,
   })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('登录已过期，请重新登录')
+  }
 
   if (!response.ok) {
     const message = await parseStreamError(response)

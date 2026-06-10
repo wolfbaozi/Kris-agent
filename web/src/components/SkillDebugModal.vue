@@ -153,9 +153,10 @@ const canSubmit = !chatStore.isStreaming
   z-index: 300;
 }
 .modal {
-  width: 500px;
+  width: 90%;
+  max-width: 500px;
   max-height: 85vh;
-  padding: 24px;
+  padding: 20px;
   background: #161b22;
   border: 1px solid #30363d;
   border-radius: 12px;

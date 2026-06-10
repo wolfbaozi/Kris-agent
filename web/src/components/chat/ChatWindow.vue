@@ -145,4 +145,22 @@ watch(
   color: #ff7b72;
   font-size: 13px;
 }
+
+@media (max-width: 768px) {
+  .header {
+    padding: 12px 14px;
+  }
+
+  .header h1 {
+    font-size: 16px;
+  }
+
+  .header p {
+    font-size: 12px;
+  }
+
+  .messages {
+    padding: 12px;
+  }
+}
 </style>

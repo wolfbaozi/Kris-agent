@@ -82,11 +82,22 @@ function toggleMode() {
 }
 
 .auth-card {
-  width: 380px;
-  padding: 32px;
+  width: 90%;
+  max-width: 380px;
+  padding: 24px 20px;
   border: 1px solid #30363d;
   border-radius: 12px;
   background: #161b22;
+}
+
+@media (max-width: 768px) {
+  .auth-card {
+    padding: 20px 16px;
+  }
+
+  .auth-card h1 {
+    font-size: 20px;
+  }
 }
 
 .auth-card h1 {

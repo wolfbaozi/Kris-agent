@@ -86,13 +86,13 @@ watch(renderedContent, () => {
 }
 
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -108,8 +108,8 @@ watch(renderedContent, () => {
 }
 
 .bubble {
-  max-width: min(720px, 85%);
-  padding: 0 16px;
+  max-width: min(720px, 88%);
+  padding: 0 12px;
   border-radius: 12px;
   line-height: 1.6;
   word-break: break-word;
@@ -193,6 +193,29 @@ watch(renderedContent, () => {
 @keyframes blink {
   50% {
     opacity: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .message {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
+  }
+
+  .bubble {
+    max-width: 90%;
+    padding: 0 10px;
+  }
+
+  .content :deep(pre code) {
+    padding: 12px;
+    font-size: 12px;
   }
 }
 </style>

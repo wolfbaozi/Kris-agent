@@ -420,9 +420,10 @@ onMounted(() => {
   z-index: 200;
 }
 .modal {
-  width: 560px;
+  width: 90%;
+  max-width: 560px;
   max-height: 80vh;
-  padding: 24px;
+  padding: 20px;
   background: #161b22;
   border: 1px solid #30363d;
   border-radius: 12px;
@@ -538,7 +539,8 @@ onMounted(() => {
   background: #1f6feb22;
 }
 .form-modal {
-  width: 480px;
+  width: 90%;
+  max-width: 480px;
   position: relative;
   max-height: 85vh;
   overflow-y: auto;

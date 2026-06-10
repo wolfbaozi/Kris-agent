@@ -124,9 +124,10 @@ onMounted(loadKeys)
 }
 
 .modal {
-  width: 480px;
+  width: 90%;
+  max-width: 480px;
   max-height: 80vh;
-  padding: 24px;
+  padding: 20px;
   background: #161b22;
   border: 1px solid #30363d;
   border-radius: 12px;
@@ -254,7 +255,8 @@ onMounted(loadKeys)
 }
 
 .form-modal {
-  width: 400px;
+  width: 90%;
+  max-width: 400px;
   position: relative;
 }
 

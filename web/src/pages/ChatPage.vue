@@ -76,9 +76,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
+  padding: 10px 16px;
   border-bottom: 1px solid #30363d;
   background: #161b22;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .app-title {
@@ -89,21 +91,42 @@ onMounted(() => {
 
 .header-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .btn-outline {
-  padding: 6px 14px;
+  padding: 5px 10px;
   border: 1px solid #30363d;
   border-radius: 6px;
   background: transparent;
   color: #c9d1d9;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .btn-outline:hover {
   background: #30363d;
+}
+
+@media (max-width: 768px) {
+  .chat-header {
+    padding: 8px 12px;
+  }
+
+  .app-title {
+    font-size: 14px;
+  }
+
+  .header-actions {
+    gap: 4px;
+  }
+
+  .btn-outline {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
 }
 
 

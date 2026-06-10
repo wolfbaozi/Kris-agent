@@ -42,13 +42,22 @@ function close(id: number) {
 <style scoped>
 .toast-container {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 12px;
+  right: 12px;
+  left: 12px;
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   max-width: 400px;
+  margin: 0 auto;
+}
+
+@media (min-width: 769px) {
+  .toast-container {
+    left: auto;
+    margin: 0;
+  }
 }
 
 .toast {

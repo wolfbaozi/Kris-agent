@@ -208,7 +208,7 @@ onMounted(async () => {
 <style scoped>
 .chat-input {
   border-top: 1px solid #30363d;
-  padding: 16px 20px;
+  padding: 12px 16px;
   background: #161b22;
 }
 
@@ -375,5 +375,31 @@ button {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .chat-input {
+    padding: 10px 12px;
+  }
+
+  .ext-selects {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .input-toolbar {
+    padding: 4px 8px 8px;
+    gap: 6px;
+  }
+
+  .model-select {
+    max-width: 140px;
+    font-size: 10px;
+  }
+
+  button {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
 }
 </style>

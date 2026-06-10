@@ -219,6 +219,9 @@ textarea:focus {
   font-family: monospace;
   resize: vertical;
   box-sizing: border-box;
+  min-height: 80px;
+  max-height: 200px;
+  overflow-y: auto;
 }
 .modal-actions {
   display: flex;

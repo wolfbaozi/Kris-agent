@@ -16,8 +16,6 @@ export const useMcpStore = defineStore('mcp', () => {
     error.value = null
     try {
       list.value = await mcpApi.list()
-    } catch (e: any) {
-      error.value = e.message || '加载MCP列表失败'
     } finally {
       loading.value = false
     }
@@ -25,15 +23,19 @@ export const useMcpStore = defineStore('mcp', () => {
 
   async function fetchQuota() {
     try {
-      quota.value = await mcpApi.getQuota()
-    } catch {}
+      quota.value = await mcpApi.getQuota(true)
+    } catch {
+      // silently ignore
+    }
   }
 
   async function fetchRunningStatus() {
     try {
-      const ids = await mcpApi.getRunningStatus()
+      const ids = await mcpApi.getRunningStatus(true)
       runningIds.value = new Set(ids)
-    } catch {}
+    } catch {
+      // silently ignore
+    }
   }
 
   async function create(data: McpFormData) {

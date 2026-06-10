@@ -1,4 +1,5 @@
-import type { StreamChunk } from './chat'
+import type { StreamChunk } from '../types/chat'
+import { emitError } from './error'
 
 const BASE_URL = '/api'
 
@@ -65,6 +66,7 @@ export async function streamRequest(
   body: unknown,
   onChunk: (chunk: StreamChunk) => void,
   signal?: AbortSignal,
+  silent = false,
 ): Promise<void> {
   const response = await fetch(BASE_URL + url, {
     method: 'POST',
@@ -75,16 +77,22 @@ export async function streamRequest(
 
   if (response.status === 401) {
     handleUnauthorized()
-    throw new Error('登录已过期，请重新登录')
+    const error = new Error('登录已过期，请重新登录')
+    if (!silent) emitError(error.message)
+    throw error
   }
 
   if (!response.ok) {
     const message = await parseStreamError(response)
-    throw new Error(message)
+    const error = new Error(message)
+    if (!silent) emitError(error.message)
+    throw error
   }
 
   if (!response.body) {
-    throw new Error('响应体为空')
+    const error = new Error('响应体为空')
+    if (!silent) emitError(error.message)
+    throw error
   }
 
   await readStream(response.body, onChunk)

@@ -12,14 +12,18 @@ const props = defineProps<{
 
 const contentRef = ref<HTMLElement | null>(null)
 
-const md = new MarkdownIt({
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+const md: MarkdownIt = new MarkdownIt({
   html: false,
   linkify: true,
   typographer: true,
   highlight: function (str, lang) {
     const code = lang && hljs.getLanguage(lang)
       ? hljs.highlight(str, { language: lang, ignoreIllegals: true }).value
-      : md.utils.escapeHtml(str)
+      : escapeHtml(str)
     const langLabel = lang ? `<span class="code-lang">${lang}</span>` : ''
     const copyBtn = '<button class="copy-btn">复制</button>'
     return `<pre class="hljs"><div class="code-header">${langLabel}${copyBtn}</div><code>${code}</code></pre>`

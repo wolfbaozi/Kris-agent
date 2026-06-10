@@ -4,6 +4,7 @@ import { useMcpStore } from '../stores/mcp'
 import { useAuthStore } from '../stores/auth'
 import { useRoleOptionStore } from '../stores/roleOption'
 import { mcpApi } from '../api/index'
+import { emitError } from '../api/error'
 
 const store = useMcpStore()
 const auth = useAuthStore()
@@ -37,11 +38,7 @@ const simpleForm = ref({
 const isKris = auth.user?.username === 'Kris'
 
 async function loadList() {
-  try {
-    await store.fetchList()
-  } catch (e: any) {
-    errorMsg.value = e.message
-  }
+  await store.fetchList()
 }
 
 function openAdd() {
@@ -104,28 +101,24 @@ async function save() {
     errorMsg.value = 'env 格式错误: ' + e.message
     return
   }
-  try {
-    if (editingId.value) {
-      await store.update(editingId.value, {
-        name: form.value.name,
-        runEnv: form.value.runEnv,
-        command: form.value.command,
-        args,
-        env,
-      })
-    } else {
-      await store.create({
-        name: form.value.name,
-        runEnv: form.value.runEnv,
-        command: form.value.command,
-        args,
-        env,
-      })
-    }
-    showForm.value = false
-  } catch (e: any) {
-    errorMsg.value = e.message
+  if (editingId.value) {
+    await store.update(editingId.value, {
+      name: form.value.name,
+      runEnv: form.value.runEnv,
+      command: form.value.command,
+      args,
+      env,
+    })
+  } else {
+    await store.create({
+      name: form.value.name,
+      runEnv: form.value.runEnv,
+      command: form.value.command,
+      args,
+      env,
+    })
   }
+  showForm.value = false
 }
 
 async function aiCreate() {
@@ -140,8 +133,6 @@ async function aiCreate() {
     await mcpApi.aiCreate(desc, simpleForm.value.role)
     await store.fetchList()
     showForm.value = false
-  } catch (e: any) {
-    errorMsg.value = e.message
   } finally {
     aiLoading.value = false
   }
@@ -161,8 +152,6 @@ async function handleFileUpload(e: Event) {
     await mcpApi.upload(file, simpleForm.value.role)
     await store.fetchList()
     showForm.value = false
-  } catch (e: any) {
-    errorMsg.value = e.message
   } finally {
     aiLoading.value = false
     input.value = ''
@@ -171,19 +160,11 @@ async function handleFileUpload(e: Event) {
 
 async function deleteMcp(id: number) {
   if (!confirm('确定删除该 MCP 配置？')) return
-  try {
-    await store.remove(id)
-  } catch (e: any) {
-    errorMsg.value = e.message
-  }
+  await store.remove(id)
 }
 
 async function toggleMcp(id: number) {
-  try {
-    await store.toggle(id)
-  } catch (e: any) {
-    errorMsg.value = e.message
-  }
+  await store.toggle(id)
 }
 
 async function exportMcp(id: number) {
@@ -204,17 +185,14 @@ async function exportMcp(id: number) {
     a.click()
     URL.revokeObjectURL(url)
   } catch (e: any) {
-    errorMsg.value = e.message
+    emitError(e.message)
   }
 }
 
 async function startMcp(id: number) {
   actionLoading.value = { ...actionLoading.value, [id]: 'start' }
-  errorMsg.value = ''
   try {
     await store.start(id)
-  } catch (e: any) {
-    errorMsg.value = e.message
   } finally {
     const newLoading = { ...actionLoading.value }
     delete newLoading[id]
@@ -224,11 +202,8 @@ async function startMcp(id: number) {
 
 async function stopMcp(id: number) {
   actionLoading.value = { ...actionLoading.value, [id]: 'stop' }
-  errorMsg.value = ''
   try {
     await store.stop(id)
-  } catch (e: any) {
-    errorMsg.value = e.message
   } finally {
     const newLoading = { ...actionLoading.value }
     delete newLoading[id]
@@ -266,9 +241,9 @@ onMounted(() => {
         <div v-for="m in store.list" :key="m.id" class="card">
           <div class="card-info">
             <span class="name">{{ m.name }}</span>
-            <span v-if="m.isGlobal || m.is_global" class="tag-global">全局</span>
-            <span class="tag env-tag">{{ m.runEnv || m.run_env }}</span>
-            <span v-if="(m.sourceType || m.source_type) === 'ai_gen'" class="tag ai-tag">AI</span>
+            <span v-if="m.is_global" class="tag-global">全局</span>
+            <span class="tag env-tag">{{ m.run_env }}</span>
+            <span v-if="m.source_type === 'ai_gen'" class="tag ai-tag">AI</span>
             <span v-if="store.runningIds.has(m.id)" class="tag running-tag">运行中</span>
             <span v-if="!m.enabled" class="tag tag-off">已禁用</span>
           </div>
@@ -293,21 +268,21 @@ onMounted(() => {
               {{ actionLoading[m.id] === 'stop' ? '停止中...' : '停止' }}
             </button>
             <button
-              v-if="!(m.isGlobal || m.is_global) || isKris"
+              v-if="!m.is_global || isKris"
               class="btn-outline-sm"
               @click="exportMcp(m.id)"
             >
               导出
             </button>
             <button
-              v-if="!(m.isGlobal || m.is_global) || isKris"
+              v-if="!m.is_global || isKris"
               class="btn-outline-sm"
               @click="openEdit(m)"
             >
               编辑
             </button>
             <button
-              v-if="!(m.isGlobal || m.is_global) || isKris"
+              v-if="!m.is_global || isKris"
               class="btn-danger-sm"
               @click="deleteMcp(m.id)"
             >
@@ -317,7 +292,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <button class="btn-add" @click="openAdd" :disabled="store.quota && !store.quota.canCreate">
+      <button class="btn-add" @click="openAdd" :disabled="!!(store.quota && !store.quota.canCreate)">
         {{ store.quota && !store.quota.canCreate ? '已达配额上限' : '+ 添加 MCP' }}
       </button>
 

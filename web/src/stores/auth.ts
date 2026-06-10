@@ -2,13 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { md5 } from 'js-md5'
 import { authApi } from '../api/index'
-
-export interface UserInfo {
-  userId: number
-  username: string
-  token: string
-  role: string
-}
+import type { UserInfo } from '../types/auth'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserInfo | null>(null)
@@ -28,13 +22,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function fetchMe() {
     try {
-      const data = await authApi.me()
+      const data = await authApi.me(true)
       role.value = data.role || 'developer'
       localStorage.setItem('role', role.value)
       if (user.value) {
         user.value.role = role.value
       }
-    } catch {}
+    } catch {
+      // silently ignore
+    }
   }
 
   async function login(username: string, password: string) {

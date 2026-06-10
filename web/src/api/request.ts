@@ -1,8 +1,7 @@
-const BASE_URL = '/api'
+import type { RequestOptions } from '../types/request'
+import { emitError } from './error'
 
-export interface RequestOptions extends RequestInit {
-  skipAuth?: boolean
-}
+const BASE_URL = '/api'
 
 function buildHeaders(options: RequestOptions): Record<string, string> {
   const headers: Record<string, string> = {
@@ -36,32 +35,40 @@ function handleUnauthorized() {
 }
 
 export async function request<T = unknown>(url: string, options: RequestOptions = {}): Promise<T> {
-  const { skipAuth: _skip, ...fetchOptions } = options
+  const { skipAuth: _skip, silent, ...fetchOptions } = options
   const headers = buildHeaders(options)
   const res = await fetch(BASE_URL + url, { ...fetchOptions, headers })
   if (res.status === 401) {
     handleUnauthorized()
-    throw new Error('登录已过期，请重新登录')
+    const error = new Error('登录已过期，请重新登录')
+    if (!silent) emitError(error.message)
+    throw error
   }
   if (!res.ok) {
     const msg = await parseError(res)
-    throw new Error(msg)
+    const error = new Error(msg)
+    if (!silent) emitError(error.message)
+    throw error
   }
   return res.json() as Promise<T>
 }
 
-export async function uploadRequest<T = unknown>(url: string, formData: FormData): Promise<T> {
+export async function uploadRequest<T = unknown>(url: string, formData: FormData, silent = false): Promise<T> {
   const headers: Record<string, string> = {}
   const token = localStorage.getItem('token')
   if (token) headers['Authorization'] = 'Bearer ' + token
   const res = await fetch(BASE_URL + url, { method: 'POST', headers, body: formData })
   if (res.status === 401) {
     handleUnauthorized()
-    throw new Error('登录已过期，请重新登录')
+    const error = new Error('登录已过期，请重新登录')
+    if (!silent) emitError(error.message)
+    throw error
   }
   if (!res.ok) {
     const msg = await parseError(res)
-    throw new Error(msg)
+    const error = new Error(msg)
+    if (!silent) emitError(error.message)
+    throw error
   }
   return res.json() as Promise<T>
 }

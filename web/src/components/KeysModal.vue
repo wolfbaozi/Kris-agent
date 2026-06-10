@@ -1,36 +1,23 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { keysApi } from '../api/index'
-
-interface KeyRecord {
-  id: number
-  provider: string
-  model: string
-  base_url: string
-  created_at: string
-}
+import type { KeyItem } from '../types/key'
 
 defineEmits<{ (e: 'close'): void }>()
 
-const keys = ref<KeyRecord[]>([])
+const keys = ref<KeyItem[]>([])
 const showForm = ref(false)
 const editingId = ref<number | null>(null)
 const form = ref({ provider: 'deepseek', apiKey: '', model: '', baseUrl: '' })
-const errorMsg = ref('')
 
 async function loadKeys() {
-  try {
-    keys.value = await keysApi.list()
-  } catch (e: any) {
-    errorMsg.value = e.message
-  }
+  keys.value = await keysApi.list()
 }
 
 function openAdd() {
   editingId.value = null
   form.value = { provider: 'deepseek', apiKey: '', model: '', baseUrl: '' }
   showForm.value = true
-  errorMsg.value = ''
 }
 
 function onProviderChange(p: string) {
@@ -44,40 +31,30 @@ function onProviderChange(p: string) {
   }
 }
 
-function openEdit(k: KeyRecord) {
+function openEdit(k: KeyItem) {
   editingId.value = k.id
   form.value = { provider: k.provider, apiKey: '', model: k.model, baseUrl: k.base_url }
   showForm.value = true
-  errorMsg.value = ''
 }
 
 async function saveKey() {
-  errorMsg.value = ''
-  try {
-    if (editingId.value) {
-      const payload: any = {}
-      if (form.value.apiKey) payload.apiKey = form.value.apiKey
-      payload.model = form.value.model
-      payload.baseUrl = form.value.baseUrl
-      await keysApi.update(editingId.value, payload)
-    } else {
-      await keysApi.create(form.value)
-    }
-    showForm.value = false
-    await loadKeys()
-  } catch (e: any) {
-    errorMsg.value = e.message
+  if (editingId.value) {
+    const payload: any = {}
+    if (form.value.apiKey) payload.apiKey = form.value.apiKey
+    payload.model = form.value.model
+    payload.baseUrl = form.value.baseUrl
+    await keysApi.update(editingId.value, payload)
+  } else {
+    await keysApi.create(form.value)
   }
+  showForm.value = false
+  await loadKeys()
 }
 
 async function deleteKey(id: number) {
   if (!confirm('确定删除该 API Key？')) return
-  try {
-    await keysApi.remove(id)
-    await loadKeys()
-  } catch (e: any) {
-    errorMsg.value = e.message
-  }
+  await keysApi.remove(id)
+  await loadKeys()
 }
 
 onMounted(loadKeys)
@@ -90,8 +67,6 @@ onMounted(loadKeys)
         <h2>API Key 管理</h2>
         <button class="btn-close" @click="$emit('close')">✕</button>
       </div>
-
-      <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
 
       <div class="keys-list">
         <div v-if="keys.length === 0" class="empty">暂无 API Key，请先添加</div>

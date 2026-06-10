@@ -20,7 +20,6 @@ const roleOptions = [
 ]
 
 async function submit() {
-  errorMsg.value = ''
   loading.value = true
   try {
     if (isRegister.value) {
@@ -29,8 +28,6 @@ async function submit() {
       await auth.login(username.value, password.value)
     }
     router.push('/chat')
-  } catch (e: any) {
-    errorMsg.value = e.message
   } finally {
     loading.value = false
   }

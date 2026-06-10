@@ -1,28 +1,19 @@
-import type { StreamChunk } from './chat'
-import type { SkillFormData } from './skill'
-import type { McpFormData } from './mcp'
+import type { StreamChunk } from '../types/chat'
+import type { SkillDebugForm } from '../types/skill'
+import type { McpDebugForm } from '../types/mcp'
 import { streamRequest } from './streamRequest'
 
-export interface SkillDebugForm extends SkillFormData {
-  description?: string
-  propertiesText?: string
-  requiredText?: string
-  toolCode?: string
-  promptContent?: string
-}
-
-export interface McpDebugForm extends McpFormData {
-  argsText?: string
-  envText?: string
-}
+export type { SkillDebugForm } from '../types/skill'
+export type { McpDebugForm } from '../types/mcp'
 
 export function debugSkill(
   form: SkillDebugForm,
   testMessage: string,
   onChunk: (chunk: StreamChunk) => void,
   signal?: AbortSignal,
+  silent = false,
 ): Promise<void> {
-  return streamRequest('/debug/skill', { form, testMessage }, onChunk, signal)
+  return streamRequest('/debug/skill', { form, testMessage }, onChunk, signal, silent)
 }
 
 export function debugMcp(
@@ -30,6 +21,7 @@ export function debugMcp(
   testMessage: string,
   onChunk: (chunk: StreamChunk) => void,
   signal?: AbortSignal,
+  silent = false,
 ): Promise<void> {
-  return streamRequest('/debug/mcp', { form, testMessage }, onChunk, signal)
+  return streamRequest('/debug/mcp', { form, testMessage }, onChunk, signal, silent)
 }

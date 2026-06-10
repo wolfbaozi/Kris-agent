@@ -1,29 +1,7 @@
 import { request } from './request'
+import type { SkillConfig, SkillFormData } from '../types/skill'
 
-export interface SkillConfig {
-  id: number
-  user_id: number
-  name: string
-  is_global: number
-  skill_type: 'tool' | 'prompt'
-  source_type: string
-  tool_schema?: any
-  tool_code?: string
-  prompt_content?: string
-  file_path: string
-  enabled: number
-  created_at: string
-}
-
-export interface SkillFormData {
-  name: string
-  skillType: 'tool' | 'prompt'
-  sourceType?: string
-  toolSchema?: any
-  toolCode?: string
-  promptContent?: string
-  filePath?: string
-}
+export type { SkillConfig, SkillFormData }
 
 export const skillApi = {
   list: (): Promise<SkillConfig[]> => request('/skills'),

@@ -58,11 +58,7 @@ async function submit() {
     }
   }
 
-  try {
-    await chatStore.debugMcpCreate(buildFormData(), form.value.testMessage.trim())
-  } catch (e: any) {
-    errorMsg.value = e.message || '调试失败'
-  }
+  await chatStore.debugMcpCreate(buildFormData(), form.value.testMessage.trim())
 }
 
 const canSubmit = !chatStore.isStreaming

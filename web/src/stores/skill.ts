@@ -14,8 +14,6 @@ export const useSkillStore = defineStore('skill', () => {
     error.value = null
     try {
       list.value = await skillApi.list()
-    } catch (e: any) {
-      error.value = e.message || '加载Skill列表失败'
     } finally {
       loading.value = false
     }

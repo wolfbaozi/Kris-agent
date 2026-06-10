@@ -1,11 +1,18 @@
 import { request, uploadRequest } from './request'
+import type { AuthResponse, MeResponse } from '../types/auth'
+import type { RoleOption } from '../types/role'
+import type { KeyItem, KeyCreateData, KeyUpdateData } from '../types/key'
+
+interface OptimizeResponse {
+  text: string
+}
 
 export const authApi = {
   login: (username: string, password: string) =>
-    request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+    request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   register: (username: string, password: string, role?: string) =>
-    request('/auth/register', { method: 'POST', body: JSON.stringify({ username, password, role }) }),
-  me: () => request('/auth/me'),
+    request<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify({ username, password, role }) }),
+  me: (silent = false) => request<MeResponse>('/auth/me', { silent }),
 }
 
 export const aiGenApi = {
@@ -56,20 +63,19 @@ export const fileApi = {
 }
 
 export const roleOptionApi = {
-  list: () => request('/role-options'),
+  list: (silent = false) => request<RoleOption[]>('/role-options', { silent }),
 }
 
 export const aiOptimizeApi = {
-  optimize: (text: string) =>
-    request('/ai-gen/optimize', { method: 'POST', body: JSON.stringify({ text }) }),
+  optimize: (text: string, silent = false) =>
+    request<OptimizeResponse>('/ai-gen/optimize', { method: 'POST', body: JSON.stringify({ text }), silent }),
 }
 
 export const keysApi = {
-  list: () => request('/apikeys'),
-  create: (data: { provider: string; apiKey: string; model?: string; baseUrl?: string }) =>
+  list: (silent = false) => request<KeyItem[]>('/apikeys', { silent }),
+  create: (data: KeyCreateData) =>
     request('/apikeys', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: { apiKey?: string; model?: string; baseUrl?: string }) =>
+  update: (id: number, data: KeyUpdateData) =>
     request('/apikeys/' + id, { method: 'PUT', body: JSON.stringify(data) }),
   remove: (id: number) => request('/apikeys/' + id, { method: 'DELETE' }),
 }
-

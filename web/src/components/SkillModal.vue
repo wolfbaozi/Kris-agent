@@ -4,6 +4,7 @@ import { useSkillStore } from '../stores/skill'
 import { useAuthStore } from '../stores/auth'
 import { useRoleOptionStore } from '../stores/roleOption'
 import { skillApi } from '../api/index'
+import { emitError } from '../api/error'
 
 const store = useSkillStore()
 const auth = useAuthStore()
@@ -38,11 +39,7 @@ const simpleForm = ref({
 const isKris = auth.user?.username === 'Kris'
 
 async function loadList() {
-  try {
-    await store.fetchList()
-  } catch (e: any) {
-    errorMsg.value = e.message
-  }
+  await store.fetchList()
 }
 
 function openAdd() {
@@ -124,45 +121,37 @@ async function save() {
       },
     }
 
-    try {
-      if (editingId.value) {
-        await store.update(editingId.value, {
-          name: form.value.name,
-          skillType: 'tool',
-          toolSchema,
-          toolCode: form.value.toolCode,
-        })
-      } else {
-        await store.create({
-          name: form.value.name,
-          skillType: 'tool',
-          toolSchema,
-          toolCode: form.value.toolCode,
-        })
-      }
-      showForm.value = false
-    } catch (e: any) {
-      errorMsg.value = e.message
+    if (editingId.value) {
+      await store.update(editingId.value, {
+        name: form.value.name,
+        skillType: 'tool',
+        toolSchema,
+        toolCode: form.value.toolCode,
+      })
+    } else {
+      await store.create({
+        name: form.value.name,
+        skillType: 'tool',
+        toolSchema,
+        toolCode: form.value.toolCode,
+      })
     }
+    showForm.value = false
   } else {
-    try {
-      if (editingId.value) {
-        await store.update(editingId.value, {
-          name: form.value.name,
-          skillType: 'prompt',
-          promptContent: form.value.promptContent,
-        })
-      } else {
-        await store.create({
-          name: form.value.name,
-          skillType: 'prompt',
-          promptContent: form.value.promptContent,
-        })
-      }
-      showForm.value = false
-    } catch (e: any) {
-      errorMsg.value = e.message
+    if (editingId.value) {
+      await store.update(editingId.value, {
+        name: form.value.name,
+        skillType: 'prompt',
+        promptContent: form.value.promptContent,
+      })
+    } else {
+      await store.create({
+        name: form.value.name,
+        skillType: 'prompt',
+        promptContent: form.value.promptContent,
+      })
     }
+    showForm.value = false
   }
 }
 
@@ -178,8 +167,6 @@ async function aiCreate() {
     await skillApi.aiCreate(desc, simpleForm.value.role)
     await store.fetchList()
     showForm.value = false
-  } catch (e: any) {
-    errorMsg.value = e.message
   } finally {
     aiLoading.value = false
   }
@@ -199,8 +186,6 @@ async function handleFileUpload(e: Event) {
     await skillApi.upload(file, simpleForm.value.role)
     await store.fetchList()
     showForm.value = false
-  } catch (e: any) {
-    errorMsg.value = e.message
   } finally {
     aiLoading.value = false
     input.value = ''
@@ -209,19 +194,11 @@ async function handleFileUpload(e: Event) {
 
 async function deleteSkill(id: number) {
   if (!confirm('确定删除该 Skill？')) return
-  try {
-    await store.remove(id)
-  } catch (e: any) {
-    errorMsg.value = e.message
-  }
+  await store.remove(id)
 }
 
 async function toggleSkill(id: number) {
-  try {
-    await store.toggle(id)
-  } catch (e: any) {
-    errorMsg.value = e.message
-  }
+  await store.toggle(id)
 }
 
 async function exportSkill(id: number) {
@@ -242,7 +219,7 @@ async function exportSkill(id: number) {
     a.click()
     URL.revokeObjectURL(url)
   } catch (e: any) {
-    errorMsg.value = e.message
+    emitError(e.message)
   }
 }
 
@@ -268,9 +245,9 @@ onMounted(() => {
         <div v-for="s in store.list" :key="s.id" class="card">
           <div class="card-info">
             <span class="name">{{ s.name }}</span>
-            <span v-if="s.isGlobal || s.is_global" class="tag-global">全局</span>
-            <span class="tag type-tag">{{ (s.skillType || s.skill_type) === 'tool' ? 'Tool' : 'Prompt' }}</span>
-            <span v-if="(s.sourceType || s.source_type) === 'ai_gen'" class="tag ai-tag">AI</span>
+            <span v-if="s.is_global" class="tag-global">全局</span>
+            <span class="tag type-tag">{{ s.skill_type === 'tool' ? 'Tool' : 'Prompt' }}</span>
+            <span v-if="s.source_type === 'ai_gen'" class="tag ai-tag">AI</span>
             <span v-if="!s.enabled" class="tag tag-off">已禁用</span>
           </div>
           <div class="card-actions">
@@ -278,21 +255,21 @@ onMounted(() => {
               {{ s.enabled ? '禁用' : '启用' }}
             </button>
             <button
-              v-if="!(s.isGlobal || s.is_global) || isKris"
+              v-if="!s.is_global || isKris"
               class="btn-outline-sm"
               @click="exportSkill(s.id)"
             >
               导出
             </button>
             <button
-              v-if="!(s.isGlobal || s.is_global) || isKris"
+              v-if="!s.is_global || isKris"
               class="btn-outline-sm"
               @click="openEdit(s)"
             >
               编辑
             </button>
             <button
-              v-if="!(s.isGlobal || s.is_global) || isKris"
+              v-if="!s.is_global || isKris"
               class="btn-danger-sm"
               @click="deleteSkill(s.id)"
             >

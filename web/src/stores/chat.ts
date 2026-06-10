@@ -83,15 +83,14 @@ export const useChatStore = defineStore('chat', () => {
         selectedKeyId.value,
         selectedMcpIds.value,
         selectedSkillIds.value,
+        true,
       )
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
-        const target = messages.value.find((m) => m.id === assistantId)
+    } catch (e: unknown) {
+      const target = messages.value.find((m) => m.id === assistantId)
+      if (e instanceof Error && e.name === 'AbortError') {
         if (target && !target.content) target.content = '(已停止生成)'
       } else {
-        const target = messages.value.find((m) => m.id === assistantId)
         const message = e instanceof Error ? e.message : '发送失败'
-        error.value = message
         if (target && !target.content) {
           target.content = `出错了：${message}`
         }
@@ -143,15 +142,14 @@ export const useChatStore = defineStore('chat', () => {
           }
         },
         ctrl.signal,
+        true,
       )
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
-        const target = messages.value.find((m) => m.id === assistantId)
+    } catch (e: unknown) {
+      const target = messages.value.find((m) => m.id === assistantId)
+      if (e instanceof Error && e.name === 'AbortError') {
         if (target && !target.content) target.content = '(已停止生成)'
       } else {
-        const target = messages.value.find((m) => m.id === assistantId)
         const message = e instanceof Error ? e.message : '调试失败'
-        error.value = message
         if (target && !target.content) {
           target.content = `出错了：${message}`
         }
@@ -203,15 +201,14 @@ export const useChatStore = defineStore('chat', () => {
           }
         },
         ctrl.signal,
+        true,
       )
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
-        const target = messages.value.find((m) => m.id === assistantId)
+    } catch (e: unknown) {
+      const target = messages.value.find((m) => m.id === assistantId)
+      if (e instanceof Error && e.name === 'AbortError') {
         if (target && !target.content) target.content = '(已停止生成)'
       } else {
-        const target = messages.value.find((m) => m.id === assistantId)
         const message = e instanceof Error ? e.message : '调试失败'
-        error.value = message
         if (target && !target.content) {
           target.content = `出错了：${message}`
         }

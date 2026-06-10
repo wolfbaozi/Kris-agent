@@ -1,56 +1,14 @@
 import { request } from './request'
+import type { McpConfig, McpFormData, McpQuota, McpTool } from '../types/mcp'
 
-export interface McpConfig {
-  id: number
-  user_id: number
-  name: string
-  is_global: number
-  run_env: string
-  source_type: string
-  server_type: string
-  command: string
-  args?: string[]
-  env?: Record<string, string>
-  file_path: string
-  enabled: number
-  config?: any
-  created_at: string
-}
-
-export interface McpFormData {
-  name: string
-  runEnv?: string
-  sourceType?: string
-  serverType?: string
-  command?: string
-  args?: string[]
-  env?: Record<string, string>
-  filePath?: string
-  config?: any
-}
-
-export interface McpQuota {
-  maxMcpCount: number
-  maxConcurrentMcp: number
-  totalMcp: number
-  enabledMcp: number
-  canCreate: boolean
-  canEnable: boolean
-}
-
-export interface McpTool {
-  mcpId: number
-  name: string
-  description: string
-  inputSchema: any
-}
+export type { McpConfig, McpFormData, McpQuota, McpTool }
 
 export const mcpApi = {
   list: (): Promise<McpConfig[]> => request('/mcps'),
 
-  getQuota: (): Promise<McpQuota> => request('/mcps/quota'),
+  getQuota: (silent = false): Promise<McpQuota> => request('/mcps/quota', { silent }),
 
-  getRunningStatus: (): Promise<number[]> => request('/mcps/running-status'),
+  getRunningStatus: (silent = false): Promise<number[]> => request('/mcps/running-status', { silent }),
 
   create: (data: McpFormData) =>
     request('/mcps', { method: 'POST', body: JSON.stringify(data) }),

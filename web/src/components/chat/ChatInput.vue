@@ -3,13 +3,7 @@ import { ref, onMounted, nextTick, watch } from 'vue'
 import { keysApi, aiOptimizeApi } from '../../api/index'
 import { useMcpStore } from '../../stores/mcp'
 import { useSkillStore } from '../../stores/skill'
-
-interface KeyOption {
-  id: number
-  provider: string
-  model: string
-  base_url: string
-}
+import type { KeyItem } from '../../types/key'
 
 defineProps<{
   disabled?: boolean
@@ -25,7 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const input = ref('')
-const keys = ref<KeyOption[]>([])
+const keys = ref<KeyItem[]>([])
 const textRef = ref<HTMLTextAreaElement | null>(null)
 const mcpStore = useMcpStore()
 const skillStore = useSkillStore()
@@ -37,13 +31,21 @@ watch(selectedSkillIds, (ids) => emit('selectSkill', [...ids]), { deep: true })
 
 function toggleMcp(id: number) {
   const s = new Set(selectedMcpIds.value)
-  s.has(id) ? s.delete(id) : s.add(id)
+  if (s.has(id)) {
+    s.delete(id)
+  } else {
+    s.add(id)
+  }
   selectedMcpIds.value = s
 }
 
 function toggleSkill(id: number) {
   const s = new Set(selectedSkillIds.value)
-  s.has(id) ? s.delete(id) : s.add(id)
+  if (s.has(id)) {
+    s.delete(id)
+  } else {
+    s.add(id)
+  }
   selectedSkillIds.value = s
 }
 
@@ -79,12 +81,14 @@ const optimizeLoading = ref(false)
 
 async function loadKeys() {
   try {
-    keys.value = await keysApi.list()
+    keys.value = await keysApi.list(true)
     if (keys.value.length > 0 && !selectedKeyId.value) {
       selectedKeyId.value = keys.value[0].id
       emit('selectKey', selectedKeyId.value)
     }
-  } catch {}
+  } catch {
+    // silently ignore
+  }
 }
 
 function onSelectKey(e: Event) {
@@ -101,11 +105,13 @@ async function optimizeInput() {
   if (!text) return
   optimizeLoading.value = true
   try {
-    const result = await aiOptimizeApi.optimize(text)
+    const result = await aiOptimizeApi.optimize(text, true)
     input.value = result.text
     await nextTick()
     adjustHeight()
-  } catch {} finally {
+  } catch {
+    // silently ignore
+  } finally {
     optimizeLoading.value = false
   }
 }

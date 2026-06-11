@@ -1,8 +1,10 @@
 package com.kris.agent.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kris.agent.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -10,6 +12,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Spring Security 安全配置
@@ -43,19 +48,23 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf().disable()
-                // 前后端分离项目禁用 CSRF（CSRF 是给传统表单用的）
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                // 无状态会话：不创建 HttpSession，完全靠 JWT 验证身份
-                // 【前端类比】相当于前端不用 Cookie Session，全靠 localStorage 里的 token
                 .and()
                 .authorizeHttpRequests()
                 .antMatchers("/api/auth/login", "/api/auth/register", "/api/health").permitAll()
-                // 白名单：登录、注册、健康检查不需要 Token
                 .anyRequest().authenticated()
-                // 其他所有接口都需要通过认证
+                .and()
+                .exceptionHandling()
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(401);
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.setCharacterEncoding("UTF-8");
+                    Map<String, Object> body = new HashMap<>();
+                    body.put("error", "登录已过期，请重新登录");
+                    new ObjectMapper().writeValue(response.getOutputStream(), body);
+                })
                 .and()
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-                // 在 Spring Security 默认的认证过滤器之前，插入我们的 JWT 过滤器
         return http.build();
     }
 
